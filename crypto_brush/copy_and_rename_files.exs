@@ -103,8 +103,9 @@ defmodule CopyRenameFiles do
   end
 
   def run do
-    source_directory = "/Users/isavita/git/cryptocurrency-icons/128/color"
-    destination_directory = "#{File.cwd!()}/128/color"
+    source_directory = "/Users/isavita/git/cryptocurrency-icons/128/white"
+    destination_directory = "#{File.cwd!()}/128/white"
+    File.mkdir_p!(destination_directory)
     copied_files = copy_and_rename_png_files(source_directory, destination_directory)
 
     Enum.each(copied_files, &IO.puts(&1))
