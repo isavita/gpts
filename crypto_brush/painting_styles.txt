@@ -1,0 +1,100 @@
+Oil painting - Using oil-based pigments as the medium. Known for rich, thick application of paint.
+Acrylic painting - Using acrylic-based pigments as the medium. Dries quickly and is very versatile.
+Watercolor painting - Using water-soluble pigments as the medium. Creates translucent washes of color.
+Gouache painting - Using opaque water-based pigments. Allows for solid coverage of the surface.
+Encaustic painting - Using heated beeswax mixed with colored pigments. Creates a translucent, glossy surface.
+Fresco - Painting on fresh, wet plaster to allow the paint to become part of the wall.
+Graffiti - Aerosol paint street art style done on outdoor walls/surfaces. Highly stylized lettering and images.
+Mural - Large scale wall painting, often social or political themes.
+Miniature painting - Extremely small, highly detailed portrait or landscape painting.
+Panoramic painting - Extra wide paintings meant to immerse the viewer, often of landscapes.
+Plein air painting - Creating artwork outside in natural light, directly observing the subject.
+Pointillism - Using many small dots of pure color that blend together to create an image.
+Pop art - Bold, simple images from popular culture and consumer goods.
+Cubism - Objects are deconstructed and depicted from multiple viewpoints simultaneously.
+Fauvism - Use of bold, vivid colors for emotional/expressionist impact.
+Impressionism - Scenes captured with visible, thick brushstrokes and an emphasis on light.
+Expressionism - Distortion and exaggeration used for emotional effect and inner meaning.
+Surrealism - Imagery from dreams and the unconscious mind blended with reality.
+Abstract art - Exploration of color, shape, and form over concrete representation.
+Conceptual art - Ideas and concepts take precedence over visual aesthetics.
+Photorealism - Highly realistic depictions based on photographs.
+Minimalism - Strictly simplified compositions stripped down to basic elements.
+Color field painting - Large areas of flat, solid color create a meditative surface.
+Hard-edge painting - Geometric forms with sharply defined edges and solid areas of color.
+Op art - Optical illusions are created through color, line, and pattern.
+Stain painting - Thinned down acrylic paint applied in transparent layers.
+Digital painting - Creation of art using digital tools, software, and tablets.
+Airbrush - Spray painting using an air compressor to propel paint in a fine mist.
+Fingerpainting - Paint applied directly with the fingers to create impressions.
+Encaustic painting - Pigments suspended in hot wax, fixed with heat.
+Scumbling - A rough, broken glazing technique using opaque paint on top of another layer.
+Sfumato - Areas of soft, hazy, smoky transitions between colors.
+Alla prima - Painting completed in one session while the paint is still wet.
+fore-edge painting - Scene painted on the edges of a book's pages. Only visible when pages are fanned.
+Action painting - Spontaneous approach emphasizing the creative act itself.
+Palette knife painting - Applying thick paint with a knife instead of a brush.
+Glazing - Multiple thin, transparent layers of color applied over a ground.
+Impasto - Thickly applied paint creating textured brushstrokes and peaks.
+Divisionism - Separated strokes of pure color which blend optically. Based on color theory.
+Mono-printing - One-off prints made by painting on a smooth surface and transferring image.
+Screen printing - Pushing ink through a stenciled mesh screen onto paper or fabric.
+Photography painting - Painting based on or incorporating photographed images.
+Paint pouring - Pouring thinned acrylics onto a surface and tilting to guide colors.
+Ink wash painting - Black or colored ink diluted with water, producing a light hue.
+Faux finishing - Painting a surface to mimic another material's texture.
+Automatism - Allowing the subconscious mind to guide hand movement and apply paint spontaneously.
+Verdaccio - Green preparatory base layer of underpainting for flesh tones.
+Wet-on-wet - Painting wet paint over pre-existing wet paint for blending.
+Drybrush - Brush nearly dried of paint dragged across canvas to create broken color and texture.
+Squircular - Combining squiggly, circular brush strokes to build up abstract compositions.
+Sgraffito - Scratching through a top layer of paint to reveal the ground underneath.
+Scumbling - Applying a thin, broken layer of opaque paint over another color.
+Texture painting - Building up paint for pronounced 3D texture.
+Wash - Diluting paint to transparent consistency and applying in layers.
+Stippling - Applying small dots in patterns to build up texture and value.
+Open form painting - No preplanned composition or concept. Shapes added spontaneously.
+Isolationism - Emphasizing a single object, figure, or small group, isolated in space.
+Luminism - Soft, atmospheric light suffusing realistic landscape scenes.
+Tachisme - Freely gestured abstract marks and brushing on the canvas.
+Color field painting - Large expanses of a single color express abstract ideas.
+Action painting - Energetic, spontaneous brushwork and dripping paint.
+Bad painting - Intentional rejection of conventional standards in favor of naïve style.
+Pointillism - Build up of dots of pure color that blend optically to create tones.
+Social realism - Depicting contemporary social issues and struggles of the working class.
+Regionalism - Depicting rural American subjects, lifestyles, and landscapes.
+Mannerism - Elongation of figures, unusual visual angles, vivid colors. Reflecting late Renaissance ideas.
+Documentary painting - Painted visual records of people, events, or environments the artist witnessed.
+Trompe l'oeil - Highly realistic imagery that optically fools the eye.
+Drip painting - Allowing paint to freely drip and splatter onto the canvas. Linked with action painting.
+Near-abstract - Some referential elements remain in an otherwise abstract composition.
+Decorative painting - Ornate, embellishing approach to painting. More focused on aesthetics than meaning.
+Neo-impressionism - Pointillist technique with a scientific basis in color theory.
+Neo-expressionism - Raw, intense, ironic styles meant to shock and evoke emotion.
+Classical realism - Idealized, highly accurate representation with roots in Renaissance art.
+Bio art - Artwork incorporating living tissues, bacteria, organisms, and organic materials.
+Systems art - The organization and system of making work is most important, rather than a fixed product.
+Shaped canvas - Canvas sized and configured in unusual shapes instead of strictly rectangular.
+Light painting - Moving a handheld light source during long exposure photography to create an image.
+Graphic painting - Hard edged shapes and designs derived from graphics and sign-painting techniques.
+Pochoir - Hand-colored stenciling through templates onto printmaking paper or fabric.
+Panography - Creating a composition by splicing together separate shots of a scene.
+Minimalism - Paintings stripped down to basic elements of form, color, or line.
+Maximalism - Overwhelmingly complex and detailed compositions with abundant visual information.
+Neoclassicism - Reviving classical aesthetics and ideals in reaction to Baroque and Rococo styles.
+Analytical cubism - Deconstructing subjects within a composition into abstract, faceted planes.
+Synthetic cubism - Combining cut paper, newsprint, or other materials with painted areas.
+Color field painting - Large expanses of a single color to convey abstract expression.
+Lyrical abstraction - Abstract, biomorphic forms suggesting mood and emotion.
+Post-painterly abstraction - Open fields of color and soft-edged shapes.
+Les Nabis - Flattened space and emphasis on design, outlined forms, and decorative color.
+Orphism - Kinetic, fractured abstraction focusing on non-naturalistic color.
+Suprematism - Simple geometric forms and shapes as subjects in their own right.
+Rayonism - Attempting to depict objects from all angles in an abstract, dynamic way.
+Constructivism - Geometric abstract art with utilitarian social purposes.
+De Stijl - Pure abstraction guided by mathematical design principles.
+Bauhaus - Geometric clarity and functionality linked to industrial design.
+Hard-edge painting - Flat areas of color with no blending or brushstrokes. Crisp edges.
+Narrative painting - Visual storytelling, often based on mythology, literature, or history.
+Neo-Geo - Abstract revival with hard-edged geometry and blocky formats.
+Outsider art - Artists outside the mainstream art world, untrained and self-taught.

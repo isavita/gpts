@@ -1,0 +1,31 @@
+Understand the Big O Notation: Familiarize yourself with the computational complexity of algorithms, especially time complexity and space complexity. Choose algorithms and data structures that are efficient for your use case.
+
+Write Readable Code: Before optimizing, make sure your code is clean and readable. It's easier to optimize well-structured code.
+
+Avoid Premature Optimization: Donald Knuth's famous adage, "Premature optimization is the root of all evil," warns against optimizing before it's necessary. First, make sure your code works correctly, then optimize for performance where needed.
+
+Profile Before Optimizing: Use profiling tools to identify bottlenecks. Optimize the parts of the code that consume the most resources or are executed most frequently.
+
+Keep It DRY (Don’t Repeat Yourself): Reuse code wherever possible to reduce redundancy and potential points of failure.
+
+Use Efficient Data Structures: Select the appropriate data structure for your task, as it can have a significant impact on performance.
+
+Optimize Loops: Minimize work inside loops, and consider loop unrolling where appropriate.
+
+Use Caching: Store the results of expensive function calls and reuse them when the same inputs occur again.
+
+Lazy Loading: Delay the loading of objects until they are needed to reduce initial load time.
+
+Concurrency and Parallelism: Use multiple threads or processes to perform tasks in parallel when it makes sense.
+
+Minimize Memory Allocation: Allocate memory outside of loops and reuse objects when possible to reduce the overhead of memory allocation and garbage collection.
+
+Reduce IO Operations: IO operations are usually costly, so minimize them, batch them, or perform them asynchronously.
+
+Use Compiler/Interpreter Optimizations: Leverage the optimizations provided by your compiler or interpreter, and understand the flags or settings that can be used to improve performance.
+
+Algorithmic Improvements: Sometimes a different approach or a mathematical insight can vastly improve performance.
+
+Keep up with Advances: Languages and compilers evolve, and staying current can give you new tools to write more efficient code.
+
+Consider the Environment: Understand the hardware and operating system where your code will run, as this can affect how you should optimize.
