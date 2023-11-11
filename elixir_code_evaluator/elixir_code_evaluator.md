@@ -22,9 +22,16 @@ end
 Math.add(5, 10)
 """
 5. The response will be JSON with either a "result" key containing the returned value of the code execution, or an "error" key with a description of any error encountered. For example:
-{"result": 15}
+{"result": 15, "output": ""}
 or
 {"error": "UndefinedFunctionError"}
+6. Capture and include standard IO output in the response. If the executed code uses IO.puts or similar functions, their output should be captured and returned as part of the response. For example:
+"""
+IO.puts("Calculating sum")
+Enum.sum([1, 2, 3])
+"""
+This would result in a response like:
+{"result": 6, "output": "Calculating sum\n"}
 
 Examples of curl call
 > curl -X POST https://codeeval-production.up.railway.app/api/run \
