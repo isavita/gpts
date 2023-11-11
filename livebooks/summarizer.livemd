@@ -1,0 +1,62 @@
+<!-- livebook:{"autosave_interval_s":30} -->
+
+# Summarizer
+
+```elixir
+Mix.install([
+  {:req, "~> 0.4.0"},
+  {:jason, "~> 1.2"}
+])
+```
+
+## Github module for interacting with github
+
+```elixir
+defmodule GitHubItem do
+  defstruct [:path, :download_url]
+
+  def new_github_item(%{"path" => path, "download_url" => download_url}) do
+    %GitHubItem{path: path, download_url: download_url}
+  end
+end
+
+defmodule GitHubExplorer do
+  def fetch_repo_file_tree(owner, repo) do
+    fetch_directory_contents(owner, repo, "")
+  end
+
+  defp fetch_directory_contents(owner, repo, path) do
+    url = "https://api.github.com/repos/#{owner}/#{repo}/contents/#{path}"
+
+    case Req.get(url) do
+      {:ok, %Req.Response{status: 200, body: body}} ->
+        body
+        |> Enum.flat_map(fn item ->
+          case item["type"] do
+            "file" ->
+              [GitHubItem.new_github_item(item)]
+
+            "dir" ->
+              fetch_directory_contents(owner, repo, item["path"])
+
+            _ ->
+              []
+          end
+        end)
+
+      {:error, _reason} ->
+        []
+    end
+  end
+end
+```
+
+```elixir
+Req.get!("https://api.github.com/repos/isavita/advent2021/contents").body
+```
+
+## Expand repo files
+
+```elixir
+GitHubExplorer.fetch_repo_file_tree("isavita", "advent2021")
+```
