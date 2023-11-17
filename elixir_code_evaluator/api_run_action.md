@@ -17,13 +17,14 @@
       "post": {
         "description": "Evaluate Elixir code",
         "operationId": "EvaluateCode",
+        "x-openai-isConsequential": false,
         "parameters": [],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                 "$ref": "#/components/schemas/RequestEvaluateCodeSchema"
+                "$ref": "#/components/schemas/RequestEvaluateCodeSchema"
               }
             }
           }
@@ -38,7 +39,7 @@
     }
   },
   "components": {
-"schemas": {
+    "schemas": {
       "RequestEvaluateCodeSchema": {
         "properties": {
           "code": {
@@ -53,7 +54,7 @@
         ],
         "title": "RequestEvaluateCodeSchema"
       }
-},
+    },
     "securitySchemes": {
       "apiKey": {
         "type": "apiKey"
