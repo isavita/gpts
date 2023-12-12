@@ -7,6 +7,7 @@ Mix.install([
 ])
 
 api_key = System.fetch_env!("LB_OPENAI_API_KEY")
+api_url = "https://api.openai.com/v1/chat/completions"
 ```
 
 ## Load the image
@@ -47,8 +48,62 @@ payload = %{
 }
 ```
 
+## Make request to OpenAI API
+
 ```elixir
-Req.get!(url)
+body = Req.post!(api_url, json: payload, headers: headers)
 ```
 
-<!-- livebook:{"offset":822,"stamp":{"token":"XCP.fXZd0stAYiJZ0XzwFaaUTucFCxyt-_31haBG32fSphbnfS6fo-QTZ2IaIfaTtw6ghPoFb4n-GDph9dZ_8qAHp38KV5OTR544k3vovbYyerQTcSkutSboBng","version":2}} -->
+```elixir
+resp = %Req.Response{
+  status: 200,
+  headers: %{
+    "alt-svc" => ["h3=\":443\"; ma=86400"],
+    "cf-cache-status" => ["DYNAMIC"],
+    "cf-ray" => ["834987eec833771d-LHR"],
+    "connection" => ["keep-alive"],
+    "content-type" => ["application/json"],
+    "date" => ["Tue, 12 Dec 2023 22:51:29 GMT"],
+    "openai-model" => ["gpt-4-1106-vision-preview"],
+    "openai-organization" => ["user-XXX"],
+    "openai-processing-ms" => ["9238"],
+    "openai-version" => ["2020-10-01"],
+    "server" => ["cloudflare"],
+    "set-cookie" => [
+      "__cf_bm=4.epteFewE32dLTJHSrf2brlj03Rb2VEzaAsnlCv31I-1702421489-1-AWktz8GjcgwqgayxtrPjx2TeuBA7fYlc6wNfchG8DZcSiAju6asE0SqpBFq9aF73vY9sbQx2iXcUdX9fVK9kP48=; path=/; expires=Tue, 12-Dec-23 23:21:29 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+      "_cfuvid=1tKjG_4WmoDeJq.s2j68g37jmWbBgCaTquYajwwCWYc-1702421489724-0-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None"
+    ],
+    "strict-transport-security" => ["max-age=15724800; includeSubDomains"],
+    "transfer-encoding" => ["chunked"],
+    "x-ratelimit-limit-requests" => ["500"],
+    "x-ratelimit-limit-tokens" => ["10000"],
+    "x-ratelimit-remaining-requests" => ["499"],
+    "x-ratelimit-remaining-tokens" => ["9693"],
+    "x-ratelimit-reset-requests" => ["2m52.8s"],
+    "x-ratelimit-reset-tokens" => ["1.842s"],
+    "x-request-id" => ["8cb71a55516b2631efd8102b07f546c0"]
+  },
+  body: %{
+    "choices" => [
+      %{
+        "finish_details" => %{"stop" => "<|fim_suffix|>", "type" => "stop"},
+        "index" => 0,
+        "message" => %{
+          "content" =>
+            "This image depicts a pixel art-style scene set in a futuristic or sci-fi environment. At the center, there is an individual sitting on a chair facing away from the viewer and working on multiple computer monitors. To the left of this person, there is a robot holding a welding mask and a wrench, suggesting it's doing some technical work. Right next to the person sits a cat gazed towards the viewer, adorned with a necklace featuring what looks like technology-themed charms.\n\nOn the right, an imposing humanoid robot is being assembled or repaired while standing in some kind of teleportation or construction beam. There is a large server rack or high-tech cabinet with active screens and glowing elements to the right of the scene.\n\nIn the upper part of the image, you can see the wording \"ADVENT OF CODE 2023\" which suggests that this image might be related to an event or challenge of the same name, likely involving coding or programming.\n\nThe background features an outer space view with stars, a rocket ship, and some planets or celestial bodies, contributing to the overall space tech theme. The scene is filled with intricate details and a vibrant color palette that emphasizes the high-tech, digital aspect of the setting.",
+          "role" => "assistant"
+        }
+      }
+    ],
+    "created" => 1_702_421_482,
+    "id" => "chatcmpl-8V5swEILM01x5X7kEwyMBmKerb63Y",
+    "model" => "gpt-4-1106-vision-preview",
+    "object" => "chat.completion",
+    "usage" => %{"completion_tokens" => 241, "prompt_tokens" => 778, "total_tokens" => 1019}
+  },
+  trailers: %{},
+  private: %{}
+}
+```
+
+<!-- livebook:{"offset":4183,"stamp":{"token":"XCP.XUgS1rc9oRW2-Pqn8Loq2ZpyIyONDvorMhom-ntBGZEV8UYAeJKVTHp83UTOGfawM7gjW379KL-1_7Ysiy9lfwE9JJVEy-YnmNNXueVPW0IoxTcJb3-bt_o","version":2}} -->
