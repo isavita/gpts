@@ -1,0 +1,50 @@
+# Mistral
+
+```elixir
+Mix.install([
+  :req,
+  :kino,
+  :jason,
+  {:replicate, "~> 1.2.0"}
+])
+
+Application.put_env(:replicate, :replicate_api_token, System.fetch_env!("LB_REPLICATE_API_TOKEN"))
+```
+
+## Set OpenHermes-2.5
+
+```elixir
+name = "mistralai/mistral-7b-instruct-v0.1"
+model = Replicate.Models.get!(name)
+version = Replicate.Models.get_latest_version!(model)
+```
+
+## Run OpenHermes-2.5
+
+```elixir
+prompt = "Write me elixir program that reverse a string"
+
+input =
+  %{
+    top_k: 50,
+    top_p: 0.9,
+    temperature: 0.5,
+    max_new_tokens: 2048,
+    prompt: prompt
+  }
+
+{:ok, prediction} = Replicate.Predictions.create(version, input)
+```
+
+## Section
+
+```elixir
+{:ok, result} = Replicate.Predictions.get(prediction.id)
+```
+
+```elixir
+result.output
+|> Enum.join()
+```
+
+<!-- livebook:{"offset":773,"stamp":{"token":"XCP.FAmi2fuH-dw2N0BlcIk4wZO3SAz1c3ivp4ftiQN9-J2RcRcye8VFzON2SpevdX6T8-R6R9l6vyBM0buhV8cb1tJGutsGAWmykNp7astAko-c0pR8kgGF1liaQGlF3g","version":2}} -->

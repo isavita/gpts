@@ -1,0 +1,54 @@
+# GPT-4 vision
+
+```elixir
+Mix.install([
+  :req,
+  :json
+])
+
+api_key = System.fetch_env!("LB_OPENAI_API_KEY")
+```
+
+## Load the image
+
+```elixir
+image = File.read!("/Users/isavita/Downloads/advent_2023_success.png")
+image_base64 = Base.encode64(image)
+```
+
+## Section
+
+```elixir
+headers = %{
+  "Content-Type" => "application/json",
+  "Authorization" => "Bearer #{api_key}"
+}
+
+payload = %{
+  "model" => "gpt-4-vision-preview",
+  "messages" => [
+    %{
+      "role" => "user",
+      "content" => [
+        %{
+          "type" => "text",
+          "text" => "What’s in this image?"
+        },
+        %{
+          "type" => "image_url",
+          "image_url" => %{
+            "url" => "data:image/jpeg;base64,#{image_base64}"
+          }
+        }
+      ]
+    }
+  ],
+  "max_tokens" => 300
+}
+```
+
+```elixir
+Req.get!(url)
+```
+
+<!-- livebook:{"offset":822,"stamp":{"token":"XCP.fXZd0stAYiJZ0XzwFaaUTucFCxyt-_31haBG32fSphbnfS6fo-QTZ2IaIfaTtw6ghPoFb4n-GDph9dZ_8qAHp38KV5OTR544k3vovbYyerQTcSkutSboBng","version":2}} -->
