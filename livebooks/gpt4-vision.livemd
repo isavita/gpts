@@ -13,11 +13,67 @@ api_url = "https://api.openai.com/v1/chat/completions"
 ## Load the image
 
 ```elixir
-image = File.read!("/Users/isavita/Downloads/advent_2023_success.png")
+image = File.read!("/Users/dimova01/git/green-bite/tmp/photo1.jpeg")
 image_base64 = Base.encode64(image)
 ```
 
-## Section
+## Prepare Prompt for format response with examples
+
+````elixir
+user_msg = """
+Identify the food in the image and if it's a dish all of its ingredients and their quantities in GRAMS.
+Focus on ingredients that have CO2e values.
+I will use this data to calculate the CO2e food print of the food.
+Whenever you are not sure or there is not enough information in the image for the ingredients use your broder knowledge to give some estimates for the ingredients and their quantities.
+
+RESPONSE FORMAT:
+The response have to be JSON formatted  surrounded with the following markup ```json<INPUT_HERE>```.
+The JSON should have the following keys
+- "food_name" - it is the name of the dish or the item if any found in the image; if no dish found in the image set it to string "none".
+- "ingredients" - ARRAY of all important ingredients for caclulating the CO2e emission of the dish. 
+Each ingredient have to include the following keys
+- "name" - the name of the ingredient.
+- "grams" - quantity ALWAYS in grams.
+If there is no entry
+
+RESPONSE EXAMPLES:
+1. Example of Black Bean Soup
+```json
+{
+"food_name": "Black Bean Soup",
+"ingredients": [
+  {"name": "black beans","grams": 250},
+  {"name": "carrot","grams": 80},
+  {"name": "yellow onion","grams": 100},
+  {"name": "garlic cloves", "grams": 4},
+  {"name": "broth", "grams": 14},
+  {"name": "oregano", "grams": 3},
+  {"name": "olive oil", "grams": 6},
+  {"name": "coriander", "grams": 2}
+]
+}
+```
+2. Example of single item
+```json
+{
+"food_name": "apple",
+"ingredients": [
+  {"name": "apple","grams": 200}
+]
+}
+```
+3. Example of no food image
+```json
+{
+"food_name": "none",
+"ingredients": []
+}
+```
+DO NOT ADD ANYTHING ELSE to your response
+"""
+````
+
+## Prepare the payload
 
 ```elixir
 headers = %{
@@ -33,7 +89,7 @@ payload = %{
       "content" => [
         %{
           "type" => "text",
-          "text" => "What’s in this image?"
+          "text" => user_msg
         },
         %{
           "type" => "image_url",
@@ -44,14 +100,86 @@ payload = %{
       ]
     }
   ],
-  "max_tokens" => 300
+  "max_tokens" => 4096
 }
 ```
 
-## Make request to OpenAI API
+## Make request to OpenAI Vision API
 
 ```elixir
 body = Req.post!(api_url, json: payload, headers: headers)
+```
+
+## Response from Photo1
+
+````elixir
+resp = %Req.Response{
+  status: 200,
+  headers: %{
+    "alt-svc" => ["h3=\":443\"; ma=86400"],
+    "cf-cache-status" => ["DYNAMIC"],
+    "cf-ray" => ["834f760e9b3060ef-LHR"],
+    "connection" => ["keep-alive"],
+    "content-type" => ["application/json"],
+    "date" => ["Wed, 13 Dec 2023 16:07:48 GMT"],
+    "openai-model" => ["gpt-4-1106-vision-preview"],
+    "openai-organization" => ["user-doj5bwaqxddwo3ojyf5mulko"],
+    "openai-processing-ms" => ["6241"],
+    "openai-version" => ["2020-10-01"],
+    "server" => ["cloudflare"],
+    "set-cookie" => [
+      "__cf_bm=KOXSb_oVB2kad2CgebY.dh1PDrSGe4o9nEwV78vol1U-1702483668-1-AQTdf5+3Z4+WbaDujw/dy1Ni+uGuYre/r9FMYSSdc9KRioT/hfotq/h0L37w9ThGimbSLZb5l8x6JaSCuHnEbMw=; path=/; expires=Wed, 13-Dec-23 16:37:48 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+      "_cfuvid=xKBbZ.fzohv70cryWjedfIttxz6S6yAWru8tJGKEzwg-1702483668485-0-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None"
+    ],
+    "strict-transport-security" => ["max-age=15724800; includeSubDomains"],
+    "transfer-encoding" => ["chunked"],
+    "x-ratelimit-limit-requests" => ["500"],
+    "x-ratelimit-limit-tokens" => ["10000"],
+    "x-ratelimit-remaining-requests" => ["498"],
+    "x-ratelimit-remaining-tokens" => ["1819"],
+    "x-ratelimit-reset-requests" => ["5m18.66s"],
+    "x-ratelimit-reset-tokens" => ["49.08s"],
+    "x-request-id" => ["49847a061dc47aecc9931b91c883e381"]
+  },
+  body: %{
+    "choices" => [
+      %{
+        "finish_details" => %{"stop" => "<|fim_suffix|>", "type" => "stop"},
+        "index" => 0,
+        "message" => %{
+          "content" =>
+            "```json\n{\n\"food_name\": \"Open Faced Liver Pate Sandwich with Pickles\",\n\"ingredients\": [\n  {\"name\": \"liver pate\", \"grams\": 50},\n  {\"name\": \"rye bread\", \"grams\": 70},\n  {\"name\": \"pickle\", \"grams\": 30}\n]\n}\n```",
+          "role" => "assistant"
+        }
+      }
+    ],
+    "created" => 1_702_483_666,
+    "id" => "chatcmpl-8VM3uKOsOVLz0zPav79tS0F1lAUSh",
+    "model" => "gpt-4-1106-vision-preview",
+    "object" => "chat.completion",
+    "usage" => %{"completion_tokens" => 71, "prompt_tokens" => 1207, "total_tokens" => 1278}
+  },
+  trailers: %{},
+  private: %{}
+}
+
+choice = List.first(resp.body["choices"] || [], %{})
+content1 = choice["message"]["content"]
+
+json_content1 =
+  content1
+  |> String.split(~r/```json\s*/)
+  |> List.last("")
+  |> String.split(~r/```/)
+  |> List.first("")
+
+json_content1 |> Jason.decode()
+````
+
+## Make request to OpenAI Assistant API
+
+```elixir
+
 ```
 
 ```elixir
@@ -104,6 +232,9 @@ resp = %Req.Response{
   trailers: %{},
   private: %{}
 }
+
+choice = List.first(resp.body["choices"] || [], %{})
+choice["message"]["content"]
 ```
 
-<!-- livebook:{"offset":4183,"stamp":{"token":"XCP.XUgS1rc9oRW2-Pqn8Loq2ZpyIyONDvorMhom-ntBGZEV8UYAeJKVTHp83UTOGfawM7gjW379KL-1_7Ysiy9lfwE9JJVEy-YnmNNXueVPW0IoxTcJb3-bt_o","version":2}} -->
+<!-- livebook:{"offset":8546,"stamp":{"token":"XCP.kzmeO2fBjtp7Tf7MGar58PQsoLJwFcYQdFf1bFhA4S6v09Axc1pWxYOOxtKoKNk5o8LpzIm1UPe5Zn9IuLRaEuXr_hdOdBemLg7Q0hV3zlEp8hYZmyNKJrI","version":2}} -->
