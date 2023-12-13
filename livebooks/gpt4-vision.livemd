@@ -13,7 +13,8 @@ api_url = "https://api.openai.com/v1/chat/completions"
 ## Load the image
 
 ```elixir
-image = File.read!("/Users/dimova01/git/green-bite/tmp/photo1.jpeg")
+image_path = "#{System.user_home!()}/git/green-bite/tmp/photo4.jpeg"
+image = File.read!(image_path)
 image_base64 = Base.encode64(image)
 ```
 
@@ -107,7 +108,7 @@ payload = %{
 ## Make request to OpenAI Vision API
 
 ```elixir
-body = Req.post!(api_url, json: payload, headers: headers)
+body = Req.post!(api_url, json: payload, headers: headers, receive_timeout: 60000)
 ```
 
 ## Response from Photo1
@@ -176,6 +177,86 @@ json_content1 =
 json_content1 |> Jason.decode()
 ````
 
+## Response photo4
+
+````elixir
+%Req.Response{
+  status: 200,
+  headers: %{
+    "alt-svc" => ["h3=\":443\"; ma=86400"],
+    "cf-cache-status" => ["DYNAMIC"],
+    "cf-ray" => ["8351b3e4ea352dd3-MAN"],
+    "connection" => ["keep-alive"],
+    "content-type" => ["application/json"],
+    "date" => ["Wed, 13 Dec 2023 22:39:36 GMT"],
+    "openai-model" => ["gpt-4-1106-vision-preview"],
+    "openai-organization" => ["user-doj5bwaqxddwo3ojyf5mulko"],
+    "openai-processing-ms" => ["10783"],
+    "openai-version" => ["2020-10-01"],
+    "server" => ["cloudflare"],
+    "set-cookie" => [
+      "__cf_bm=iibgWzs_YoRwXvQie88btUqLrPppidoozmUjHxcHqXk-1702507176-1-ATjGfPfkdBlTXZ411phQJUH/MrJ9oN9l3ZMpJrJG5yf/U5LATL9FR8WC0dqnLqzTgz+KjorHtYAzX7B7qq+Vpqs=; path=/; expires=Wed, 13-Dec-23 23:09:36 GMT; domain=.api.openai.com; HttpOnly; Secure; SameSite=None",
+      "_cfuvid=cRD1U1Y5orH65bcQHvFzQmEYI3mOSVhv3BMWvJYP4Oo-1702507176889-0-604800000; path=/; domain=.api.openai.com; HttpOnly; Secure; SameSite=None"
+    ],
+    "strict-transport-security" => ["max-age=15724800; includeSubDomains"],
+    "transfer-encoding" => ["chunked"],
+    "x-ratelimit-limit-requests" => ["500"],
+    "x-ratelimit-limit-tokens" => ["10000"],
+    "x-ratelimit-remaining-requests" => ["495"],
+    "x-ratelimit-remaining-tokens" => ["5502"],
+    "x-ratelimit-reset-requests" => ["13m26.021s"],
+    "x-ratelimit-reset-tokens" => ["26.988s"],
+    "x-request-id" => ["d8a24dc60ffc39698dc8d5da9da96d0c"]
+  },
+  body: %{
+    "choices" => [
+      %{
+        "finish_details" => %{"stop" => "<|fim_suffix|>", "type" => "stop"},
+        "index" => 0,
+        "message" => %{
+          "content" =>
+            "```json\n{\n\"food_name\": \"Vegetable Empanada\",\n\"ingredients\": [\n  {\"name\": \"flour\",\"grams\": 120},\n  {\"name\": \"peas\",\"grams\": 30},\n  {\"name\": \"carrot\",\"grams\": 20},\n  {\"name\": \"onion\",\"grams\": 10},\n  {\"name\": \"bell pepper\",\"grams\": 10},\n  {\"name\": \"corn\",\"grams\": 20},\n  {\"name\": \"olive oil\",\"grams\": 5}\n]\n}\n```",
+          "role" => "assistant"
+        }
+      }
+    ],
+    "created" => 1_702_507_172,
+    "id" => "chatcmpl-8VSB21F2d7yU0txHBEPWS1LsmFLZg",
+    "model" => "gpt-4-1106-vision-preview",
+    "object" => "chat.completion",
+    "usage" => %{"completion_tokens" => 114, "prompt_tokens" => 1207, "total_tokens" => 1321}
+  },
+  trailers: %{},
+  private: %{}
+}
+````
+
+## Add StringExtractor
+
+````elixir
+defmodule StringExtractor do
+  def extract_content(str) do
+    start_pattern = "```json"
+    end_pattern = "```"
+
+    case String.split(str, start_pattern) do
+      [_before, rest] ->
+        case String.split(rest, end_pattern) do
+          [content | _] -> content
+          _ -> str
+        end
+
+      _ ->
+        str
+    end
+  end
+end
+````
+
+```elixir
+StringExtractor.extract_content(content1)
+```
+
 ## Make request to OpenAI Assistant API
 
 ```elixir
@@ -237,4 +318,4 @@ choice = List.first(resp.body["choices"] || [], %{})
 choice["message"]["content"]
 ```
 
-<!-- livebook:{"offset":8546,"stamp":{"token":"XCP.kzmeO2fBjtp7Tf7MGar58PQsoLJwFcYQdFf1bFhA4S6v09Axc1pWxYOOxtKoKNk5o8LpzIm1UPe5Zn9IuLRaEuXr_hdOdBemLg7Q0hV3zlEp8hYZmyNKJrI","version":2}} -->
+<!-- livebook:{"offset":11439,"stamp":{"token":"XCP.uZYxlPAyhN8effulF29iHb01dppemvmLTAZHLfknju-IECFndCU5duQh5Qt_8wKtWcycyE2QhXocGPgNLhqEndNzdwV_bjIfC3ukZTIVBovamL4TztbZiGE","version":2}} -->
