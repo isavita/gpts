@@ -344,24 +344,54 @@ model = "gpt-4-1106-preview"
 ## Create Thread
 
 ```elixir
-threads_api = "https://api.openai.com/v1/threads"
+threads_api_url = "https://api.openai.com/v1/threads"
 
-headers = %{
+threads_headers = %{
   "Authorization" => "Bearer #{api_key}",
   "Content-Type" => "application/json",
   "OpenAI-Beta" => "assistants=v1"
 }
 
-msg = """
+# Req.post!(threads_api_url, json: %{}, headers: threads_headers, receive_timeout: 60000).body["id"]
+thread_id = "thread_2NaMJt61UHoaQ4vXoYiWXi6U"
+```
+
+```elixir
+threads_messages_utl = "https://api.openai.com/v1/threads/#{thread_id}/messages"
+
+m1 = """
+{
+"food_name": "Open Faced Liver Pate Sandwich with Pickles",
+"ingredients": [
+  {"name": "liver pate", "grams": 50},
+  {"name": "rye bread", "grams": 70},
+  {"name": "pickle", "grams": 30}
+]
+}
 """
 
+msg1 = %{
+  "role" => "user",
+  "content" => m1
+}
+
+thread_resp =
+  Req.post!(threads_messages_utl, json: msg1, headers: threads_headers, receive_timeout: 60000)
+```
+
+## Run thread
+
+```elixir
+threads_run_url = "https://api.openai.com/v1/threads/#{THREAD_ID}/runs"
+
+threads_headers = %{
+  "Authorization" => "Bearer #{api_key}",
+  "Content-Type" => "application/json",
+  "OpenAI-Beta" => "assistants=v1"
+}
+
 payload = %{
-  "messages" => [
-    %{
-      "role" => "user",
-      "content" => msg
-    }
-  ]
+  "assistant_id" => assistant_id
 }
 ```
 
@@ -426,4 +456,4 @@ choice = List.first(resp.body["choices"] || [], %{})
 choice["message"]["content"]
 ```
 
-<!-- livebook:{"offset":14327,"stamp":{"token":"XCP.gH0IjNEs7yE_EYx-3kPOU1jPx6DpxL4BjIiCIaZXkqoRTnm98WxEXu4ymaXa4lelENYfNLLXlLYlpzej8eNJd3PLhuA3MzzGki2AA3JQyTrUZWLf_BFYDXg","version":2}} -->
+<!-- livebook:{"offset":15132,"stamp":{"token":"XCP.T5z8x685xJZALv94hZf42qROjiNefAMsu8fAPJxMufgYSjJog6ST5cIqacyiuysF4LOdONevoWN0vR9uno4PvHLxjmVeUc9tAMILcE-Suwu7yssnrqE0xwA","version":2}} -->
