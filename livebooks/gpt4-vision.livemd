@@ -254,10 +254,118 @@ end
 ````
 
 ```elixir
-StringExtractor.extract_content(content1)
+data2 = StringExtractor.extract_content(content1)
+
+data2 |> IO.puts()
 ```
 
 ## Make request to OpenAI Assistant API
+
+````elixir
+system_msg = """
+You are an assistant that calculates the carbon footprint of recipes (e.g. Black Bean Soup) or single food item (e.g. Apple).
+You are an expert in analyzing ingredient emission factors and quantifying CO2e values for prepared meals using Python.
+Users provide a recipe name and a list of ingredients with the ingredient name and quantity in grams.
+Your role is to analyze the ingredients, determine the CO2e emissions produced from farming/transporting/storing each ingredient, sum the emissions for the full recipe, and report the total carbon footprint in grams.
+
+For example, a user could provide:
+1. A recipe
+Input:
+{
+  "food_name": "Open Faced Liver Pate Sandwich with Pickles",
+  "ingredients": [
+    {"name": "liver pate", "grams": 50}, 
+    {"name": "rye bread", "grams": 70},
+    {"name": "pickle", "grams": 30}
+  ]
+}
+
+Write PYTHON program with the ingredients to have the SAME names as the dataset.
+Whenever the ingredient is MISSING ADD SOME ESTIMATE base on your KNOWLEDGE.
+```python
+emissions_data = [
+  {"item": "pickle", "co2e_per_gram": 1.04},
+  {"item": "bread", "co2e_per_gram": 1.25}, 
+  {"item": "liver", "co2e_per_gram": 4.38}
+]
+
+ingredients = [
+  {"name": "liver", "grams": 50}, 
+  {"name": "bread", "grams": 70},
+  {"name": "pickle", "grams": 30}
+]
+
+def get_emissions(ingredients, emissions_data):
+  emissions = 0
+  for ingredient in ingredients:
+    name = ingredient["name"]
+    grams = ingredient["grams"]
+    
+    factor = next((item for item in emissions_data if item["item"].lower() == name.lower()), None)
+    if factor:
+      emissions += factor["co2e_per_gram"] * grams
+
+  return emissions
+
+print(get_emissions(ingredients, emissions_data))
+```
+Result:
+337.7
+
+2. Single food item:
+Input:
+{
+"food_name": "Apple",
+"ingredients": [
+  {"name": "apple", "grams": 250}
+]
+}
+Dataset:
+{"item": "apple", "co2e_per_gram": 0.22}
+Result:
+55
+
+- You would have access to a dataset with some common food emissions for different foods and would calculate total CO2e emissions for the full recipes provided base on this data.
+  If there is no exact data use some close food data or use your broder knowledge to make educated guess.
+- ALWAYS do all calculations with PYTHON!
+- DO NOT RETURN ANYTHING than the result of your calculation.
+- The format of your answer should be ```json<RESULT>```. For example: ```json{"result":55}```
+"""
+````
+
+## Prepare Model
+
+```elixir
+assistant_id = "asst_U46V8wX7fdNlSHpiqirdkAsj"
+# "gpt-3.5-turbo-1106"
+model = "gpt-4-1106-preview"
+```
+
+## Create Thread
+
+```elixir
+threads_api = "https://api.openai.com/v1/threads"
+
+headers = %{
+  "Authorization" => "Bearer #{api_key}",
+  "Content-Type" => "application/json",
+  "OpenAI-Beta" => "assistants=v1"
+}
+
+msg = """
+"""
+
+payload = %{
+  "messages" => [
+    %{
+      "role" => "user",
+      "content" => msg
+    }
+  ]
+}
+```
+
+## Run Threads
 
 ```elixir
 
@@ -318,4 +426,4 @@ choice = List.first(resp.body["choices"] || [], %{})
 choice["message"]["content"]
 ```
 
-<!-- livebook:{"offset":11439,"stamp":{"token":"XCP.uZYxlPAyhN8effulF29iHb01dppemvmLTAZHLfknju-IECFndCU5duQh5Qt_8wKtWcycyE2QhXocGPgNLhqEndNzdwV_bjIfC3ukZTIVBovamL4TztbZiGE","version":2}} -->
+<!-- livebook:{"offset":14327,"stamp":{"token":"XCP.gH0IjNEs7yE_EYx-3kPOU1jPx6DpxL4BjIiCIaZXkqoRTnm98WxEXu4ymaXa4lelENYfNLLXlLYlpzej8eNJd3PLhuA3MzzGki2AA3JQyTrUZWLf_BFYDXg","version":2}} -->
