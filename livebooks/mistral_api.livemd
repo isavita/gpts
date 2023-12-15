@@ -25,7 +25,11 @@ completion_url = "https://api.mistral.ai/v1/chat/completions"
 
 ```elixir
 msg = """
-write me simple svelte app for application that calculates my CO2e emission for food.
+Write me README for MIT license github repository.
+That is containing my GPTs for OpenAI, also some livebooks in elixir with experiments.
+I have also some info for my instruction prompts etc.
+Here some of the files that I have.
+Signed the README as created by "mistral-medium"
 """
 
 payload = %{
@@ -50,4 +54,4 @@ content = tiny_resp["choices"] |> hd() |> get_in(["message", "content"])
 content |> IO.puts()
 ```
 
-<!-- livebook:{"offset":866,"stamp":{"token":"XCP.16iNavd0lW1OT62pIgVsKO5oZDSSxe2qYq1YViZNwNagPjei2MB3Kso3Ao9mTzEEqniQJJZknyZwAfwHYawfpBQcPPEmLZhaqF44-sTmH69KFR6czVXBW1QY","version":2}} -->
+<!-- livebook:{"offset":1057,"stamp":{"token":"XCP.Yv6aP3EO7VtpGof72VGcl-UTtCO-rgO9Wj7WskW_wHqEJ-m1ClvXBtnrj0t7MAh19KA8mPsNPRcqclCObiMzcNJIRMvkQ7vW8eFP3Q-I9xplZinqtcOiHq30","version":2}} -->
