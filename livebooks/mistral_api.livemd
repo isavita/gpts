@@ -1,0 +1,53 @@
+# Mistral API
+
+```elixir
+Mix.install([
+  :req,
+  :json
+])
+
+api_key = System.fetch_env!("LB_MISTRAL_API_KEY")
+```
+
+## Endpoint and Headers
+
+```elixir
+headers = %{
+  "Content-Type" => "application/json",
+  "Accept" => "application/json",
+  "Authorization" => "Bearer #{api_key}"
+}
+
+completion_url = "https://api.mistral.ai/v1/chat/completions"
+```
+
+## Mistral Tiny
+
+```elixir
+msg = """
+write me simple svelte app for application that calculates my CO2e emission for food.
+"""
+
+payload = %{
+  "model" => "mistral-medium",
+  "temperature" => 0.1,
+  "messages" => [
+    %{
+      "role" => "user",
+      "content" => msg
+    }
+  ]
+}
+
+tiny_resp =
+  Req.post!(completion_url, json: payload, headers: headers, receive_timeout: 60000).body
+```
+
+## Process the result
+
+```elixir
+content = tiny_resp["choices"] |> hd() |> get_in(["message", "content"])
+content |> IO.puts()
+```
+
+<!-- livebook:{"offset":866,"stamp":{"token":"XCP.16iNavd0lW1OT62pIgVsKO5oZDSSxe2qYq1YViZNwNagPjei2MB3Kso3Ao9mTzEEqniQJJZknyZwAfwHYawfpBQcPPEmLZhaqF44-sTmH69KFR6czVXBW1QY","version":2}} -->
