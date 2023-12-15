@@ -30,6 +30,27 @@ That is containing my GPTs for OpenAI, also some livebooks in elixir with experi
 I have also some info for my instruction prompts etc.
 Here some of the files that I have.
 Signed the README as created by "mistral-medium"
+ls
+LICENSE               crypto_brush          livebooks
+README.md             custom_instructions
+code_optimizer        elixir_code_evaluator
+ls code_optimizer                         
+16_rules_for_optimization.txt      ten_commandments_and_five_rules.md
+code_optimizer.md                  the_grug_brained_developer.txt
+notes_on_programming_in_c.txt
+ls crypto_brush                       
+128                        painting_styles.txt
+copy_and_rename_files.exs  png
+crypto_brush.md            svg
+crypto_icons.txt           templates_and_examples.txt
+painters.txt
+ ls custom_instructions                  
+programming.md  stock_images.md
+ls elixir_code_evaluator               
+api_run_action.md        elixir_code_evaluator.md examles.exs
+ ls livebooks                          127 ✘ │ 23:19:43
+gpt2.livemd        mistral.livemd     summarizer.livemd
+gpt4-vision.livemd mistral_api.livemd
 """
 
 payload = %{
@@ -54,4 +75,4 @@ content = tiny_resp["choices"] |> hd() |> get_in(["message", "content"])
 content |> IO.puts()
 ```
 
-<!-- livebook:{"offset":1057,"stamp":{"token":"XCP.Yv6aP3EO7VtpGof72VGcl-UTtCO-rgO9Wj7WskW_wHqEJ-m1ClvXBtnrj0t7MAh19KA8mPsNPRcqclCObiMzcNJIRMvkQ7vW8eFP3Q-I9xplZinqtcOiHq30","version":2}} -->
+<!-- livebook:{"offset":1957,"stamp":{"token":"XCP.Mfl_VhPKUCp9yK6p1_E_DT7A5hdcUz9-Sa93ePHM59FnZHGmyulq9NNfD7Cj5-Yr1PPdVAgrS5aLU9QbqKKyMLj-1LUQMrYYdQl_CQ9Y0rAdkUMaPBd3W9QR","version":2}} -->
