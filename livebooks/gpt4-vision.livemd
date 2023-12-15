@@ -255,8 +255,6 @@ end
 
 ```elixir
 data2 = StringExtractor.extract_content(content1)
-
-data2 |> IO.puts()
 ```
 
 ## Make request to OpenAI Assistant API
@@ -352,12 +350,16 @@ threads_headers = %{
   "OpenAI-Beta" => "assistants=v1"
 }
 
-# Req.post!(threads_api_url, json: %{}, headers: threads_headers, receive_timeout: 60000).body["id"]
-thread_id = "thread_2NaMJt61UHoaQ4vXoYiWXi6U"
+thread_id =
+  Req.post!(threads_api_url, json: %{}, headers: threads_headers, receive_timeout: 60000).body[
+    "id"
+  ]
 ```
 
+## Add message to a Thread
+
 ```elixir
-threads_messages_utl = "https://api.openai.com/v1/threads/#{thread_id}/messages"
+threads_messages_url = "https://api.openai.com/v1/threads/#{thread_id}/messages"
 
 m1 = """
 {
@@ -368,6 +370,7 @@ m1 = """
   {"name": "pickle", "grams": 30}
 ]
 }
+Calculate the total CO2 for this recipe in grams.
 """
 
 msg1 = %{
@@ -376,13 +379,26 @@ msg1 = %{
 }
 
 thread_resp =
-  Req.post!(threads_messages_utl, json: msg1, headers: threads_headers, receive_timeout: 60000)
+  Req.post!(threads_messages_url, json: msg1, headers: threads_headers, receive_timeout: 60000)
+```
+
+## Get thread
+
+```elixir
+threads_url = "https://api.openai.com/v1/threads/#{thread_id}"
+Req.get!(threads_url, headers: threads_headers, receive_timeout: 60000)
+```
+
+## Get thread messages
+
+```elixir
+Req.get!(threads_messages_url, headers: threads_headers, receive_timeout: 60000)
 ```
 
 ## Run thread
 
 ```elixir
-threads_run_url = "https://api.openai.com/v1/threads/#{THREAD_ID}/runs"
+threads_run_url = "https://api.openai.com/v1/threads/#{thread_id}/runs"
 
 threads_headers = %{
   "Authorization" => "Bearer #{api_key}",
@@ -393,12 +409,41 @@ threads_headers = %{
 payload = %{
   "assistant_id" => assistant_id
 }
+
+thread_run_id =
+  Req.post!(threads_run_url, json: payload, headers: threads_headers, receive_timeout: 60000).body[
+    "id"
+  ]
 ```
 
-## Run Threads
+## Get Thread's State
 
 ```elixir
+run_state = Req.get!(threads_run_url, headers: threads_headers, receive_timeout: 60000)
+```
 
+## Explore run state
+
+```elixir
+last_run_id = run_state.body["last_id"]
+
+Req.get!("https://api.openai.com/v1/threads/#{thread_id}/runs/#{last_run_id}",
+  headers: threads_headers
+)
+```
+
+## Explore messages
+
+```elixir
+messages_url = "https://api.openai.com/v1/threads/#{thread_id}/messages"
+hd(Req.get!(messages_url, headers: threads_headers, receive_timeout: 60000).body["data"] || [%{}])
+```
+
+## Get message
+
+```elixir
+messages_url = "https://api.openai.com/v1/threads/#{thread_id}/messages"
+Req.get!(messages_url, headers: threads_headers, receive_timeout: 60000)
 ```
 
 ```elixir
@@ -456,4 +501,4 @@ choice = List.first(resp.body["choices"] || [], %{})
 choice["message"]["content"]
 ```
 
-<!-- livebook:{"offset":15132,"stamp":{"token":"XCP.T5z8x685xJZALv94hZf42qROjiNefAMsu8fAPJxMufgYSjJog6ST5cIqacyiuysF4LOdONevoWN0vR9uno4PvHLxjmVeUc9tAMILcE-Suwu7yssnrqE0xwA","version":2}} -->
+<!-- livebook:{"offset":16244,"stamp":{"token":"XCP.oeoQIXIy-HLh_vgPbAv09pZZ56lFYanz2R8EdOwk46JIoKb5mGO5FttOEONX2VFRvh9Cjpr7wVUMQPHiK6AeLU18lJPP5fV_tA8DrNgssr3-6sEBFzexz5c","version":2}} -->
