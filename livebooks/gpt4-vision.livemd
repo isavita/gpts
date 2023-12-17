@@ -501,4 +501,4 @@ choice = List.first(resp.body["choices"] || [], %{})
 choice["message"]["content"]
 ```
 
-<!-- livebook:{"offset":16244,"stamp":{"token":"XCP.oeoQIXIy-HLh_vgPbAv09pZZ56lFYanz2R8EdOwk46JIoKb5mGO5FttOEONX2VFRvh9Cjpr7wVUMQPHiK6AeLU18lJPP5fV_tA8DrNgssr3-6sEBFzexz5c","version":2}} -->
+<!-- livebook:{"offset":16244,"stamp":{"token":"XCP.0MzvR9F7tjg2QLoPbV21tUlY6OLNJTJP2EEpOKzvVmq8Bo63aQnv3Jd2YTqvVPN7w5dPWVuQ91V8f42QyWh3UlouGth_PN6dqu9qjA0_EX7IEImsEqXf7hc","version":2}} -->

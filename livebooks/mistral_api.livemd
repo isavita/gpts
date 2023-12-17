@@ -21,6 +21,64 @@ headers = %{
 completion_url = "https://api.mistral.ai/v1/chat/completions"
 ```
 
+```elixir
+defmodule MistralUtils do
+  @moduledoc """
+  Provides utility functions for processing responses from the Mistral API.
+  """
+
+  @doc ~S"""
+  Extracts the completion from the response body of the Anthropic API.
+
+  This function parses the response from the API, focusing on extracting the 'completion' field. It handles both successful and error responses, returning a string that represents the completion or an error message.
+
+  In the case of successful responses, it returns the 'completion' field's content. For error responses, it returns a formatted error message.
+
+  ## Examples
+
+  Successful response:
+      iex> response = %{
+      ...> "choices" => [
+      ...>   %{
+      ...>      "finish_reason" => "stop",
+      ...>      "index" => 0,
+      ...>      "message" => %{
+      ...>         "content" => "As CO2eFoodGPT, I help you understand the carbon footprint of your recipes and food items. I analyze major contributors to greenhouse gas emissions and provide estimates for missing data. My goal is to offer transparency, enabling you to make informed decisions about your food choices and their environmental impact. I provide clear explanations, highlight key emission sources, and ensure honesty when uncertainty arises. Trust me to be your guide in exploring the carbon footprint of your meals.",
+      ...>         "role" => "assistant"
+      ...>      }
+      ...>   }
+      ...> ],
+      ...> "created" => 1702812391,
+      ...> "id" => "cmpl-63a74b88dca34452be729117c9304948",
+      ...> "model" => "mistral-small",
+      ...> "object" => "chat.completion",
+      ...> "usage" => %{"completion_tokens" => 99, "prompt_tokens" => 291, "total_tokens" => 390}
+      ...> }
+      ...> MistralUtils.extract_completion(response)
+      "As CO2eFoodGPT, I help you understand the carbon footprint of your recipes and food items. I analyze major contributors to greenhouse gas emissions and provide estimates for missing data. My goal is to offer transparency, enabling you to make informed decisions about your food choices and their environmental impact. I provide clear explanations, highlight key emission sources, and ensure honesty when uncertainty arises. Trust me to be your guide in exploring the carbon footprint of your meals."
+
+  Error response:
+      iex> error_response = %{
+      ...>   "message" => "No API key found in request", 
+      ...>   "request_id" => "63798e646813837a34d2f523f145bc10"
+      ...> }
+      ...> MistralUtils.extract_completion(error_response)
+      "Error: %{\"message\" => \"No API key found in request\", \"request_id\" => \"63798e646813837a34d2f523f145bc10\"}"
+  """
+  @spec extract_completion(map()) :: binary()
+  def extract_completion(%{"choices" => choices}) do
+    choice =
+      Enum.find(choices || [], %{}, fn completion ->
+        completion["finish_reason"] == "stop"
+      end)
+
+    get_in(choice, ["message", "content"])
+  end
+
+  def extract_completion(error), do: "Error: #{inspect(error)}"
+end
+```
+
 ## Mistral Tiny
 
 ```elixir
@@ -64,15 +122,169 @@ payload = %{
   ]
 }
 
-tiny_resp =
-  Req.post!(completion_url, json: payload, headers: headers, receive_timeout: 60000).body
+# tiny_resp = Req.post!(completion_url, json: payload, headers: headers, receive_timeout: 60000).body
 ```
+
+## Prompt to get
+
+````elixir
+msg = """
+- Give me short description of GPT model that is made to analyze CO2e emissions for FOOD.
+- The description will be shown on website and on mobile devices thus it should be short and informative.
+- Make the description to be from first person point of view as the model wrote it itself.
+
+Here in triple backticks are the instructions of the model.
+```
+CO2eFoodGPT specializes in calculating the carbon footprint of recipes or single food items, focusing on identifying the major contributors to CO2e emissions. It uses a dataset of emission factors and writes Python code to analyze these factors. When an ingredient is missing from the dataset, CO2eFoodGPT will use its expertise to provide an educated estimate. The GPT's responses will include the Python code used for the calculations, ensuring the names of the ingredients match those in the dataset. It will highlight key contributors to emissions in the recipe and provide a clear, concise explanation. When uncertain about an ingredient's emission factor, CO2eFoodGPT will communicate this uncertainty transparently.
+```
+
+- Don't mention programming language or any details of how the model does what it does.
+- Make it informative in a way that will communicate what is the purpose of the agent and how could it be used.
+"""
+
+payload = %{
+  "model" => "mistral-small",
+  "temperature" => 0.5,
+  "messages" => [
+    %{
+      "role" => "user",
+      "content" => msg
+    }
+  ]
+}
+
+# resp_body = Req.post!(completion_url, json: payload, headers: headers, receive_timeout: 60000).body
+````
+
+## Generate Description of for GPT
+
+````elixir
+msg = """
+Using the following bulletpoints:
+
+1. Write Clear Instructions:
+- Be specific: Clarity in instructions leads to more relevant outcomes.
+- Define the desired output length and complexity.
+- Demonstrate preferred formats.
+- Minimize ambiguity to enhance model accuracy.
+
+2. Provide Reference Text:
+- Counteract potential fabrications with concrete reference materials.
+- Reference texts guide the model towards accurate and reliable answers.
+
+3. Split Complex Tasks into Simpler Subtasks:
+- Break down tasks to reduce errors and improve manageability.
+- Consider tasks as workflows of simpler, interconnected steps.
+
+4. Give the Model Time to "Think":
+- Allow the model to process and reason, similar to a human solving a complex problem.
+- Encourage a "chain of thought" approach for more accurate reasoning.
+
+5. Use External Tools:
+- Supplement the model's capabilities with specialized tools for specific tasks.
+- Leverage resources like text retrieval systems or code execution engines.
+
+6. Test Changes Systematically:
+- Measure improvements with a comprehensive testing approach.
+- Ensure that modifications lead to overall performance enhancements.
+
+Generate me comprehensive INSTRUCTIONS for CO2eFoodGPT. A GPT that is analyzing the CO2e emissions base on image of the food (e.g. Black Bean Soup), item (e.g. Apple), eventually name of recipe given by the user or ingredients givent with their quantities.
+- CO2eFoodGPT have to try to gader enough information to be able to calculate approximate value for the CO2e emissions. If there is enough information (e.g. clear image or well described recipe or single item), the model should try to not ask further questions the user.
+- The model should use CO2ePerGram_FoodItems.csv file to get information for base "FoodName" and its "CO2ePerGram".
+- Whenever food is missing the model should try to use available data for close food to estimate it.
+- The model should use its broder knowledge to estimate CO2e emissions.
+- Whenever there is really not enough information the model should ask for more information the user. By suggesting the user take a picture of the food or/and give the name of the recipe.
+- Additional information as the souce of the food if local or not or if it is in seasson or not might help the model.
+- The model INSTRUCTIONS should include following snipped of python code.
+
+START_OF_EXAMPLES
+For example, CO2eFoodGPT could extract from the user following information:
+1. A recipe
+Input:
+{
+  "food_name": "Open Faced Liver Pate Sandwich with Pickles",
+  "ingredients": [
+    {"name": "liver pate", "grams": 50}, 
+    {"name": "rye bread", "grams": 70},
+    {"name": "pickle", "grams": 30}
+  ]
+}
+Write PYTHON program with the ingredients to have the SAME names as the dataset.
+Whenever the ingredient is MISSING ADD SOME ESTIMATE base on your KNOWLEDGE.
+```python
+emissions_data = [
+  {"item": "pickle", "co2e_per_gram": 1.04},
+  {"item": "bread", "co2e_per_gram": 1.25}, 
+  {"item": "liver", "co2e_per_gram": 4.38}
+]
+
+ingredients = [
+  {"name": "liver", "grams": 50}, 
+  {"name": "bread", "grams": 70},
+  {"name": "pickle", "grams": 30}
+]
+
+def get_emissions(ingredients, emissions_data):
+  emissions = 0
+  for ingredient in ingredients:
+    name = ingredient["name"]
+    grams = ingredient["grams"]
+    
+    factor = next((item for item in emissions_data if item["item"].lower() == name.lower()), None)
+    if factor:
+      emissions += factor["co2e_per_gram"] * grams
+
+  return emissions
+
+print(get_emissions(ingredients, emissions_data))
+```
+Result:
+337.7
+2. Single food item:
+Input:
+{
+"food_name": "Apple",
+"ingredients": [
+  {"name": "apple", "grams": 250}
+]
+}
+Dataset:
+{"item": "apple", "co2e_per_gram": 0.22}
+Result:
+55
+END_OF_EXAMPLES
+
+- The CO2eFoodGPT would have access to a dataset with some common food emissions for different foods and would calculate total CO2e emissions for the full recipes provided base on this data.
+  If there is no exact data use some close food data or use your broder knowledge including browsing the internet for more information to make educated guess.
+- CO2eFoodGPT HAVE TO ALWAYS do all calculations with PYTHON!
+- DO NOT RETURN ANYTHING than the result of your calculation.
+- The format of the answer should include grams or kg symbol to make it clear to the user for what amount we are talking about.
+
+
+Give me well formatted and detailed instruction for CO2eFoodGPT base on everything mention above.
+Add general contenxt that the CO2eFoodGPT should always try to be clear and concise. It should not produce lenty responses. Put that at the beginning as general information. The tone of CO2eFoodGPT should be professional and friendly.
+"""
+
+payload = %{
+  "model" => "mistral-medium",
+  "temperature" => 0.5,
+  "messages" => [
+    %{
+      "role" => "user",
+      "content" => msg
+    }
+  ]
+}
+
+resp_body =
+  Req.post!(completion_url, json: payload, headers: headers, receive_timeout: 600_000).body
+````
 
 ## Process the result
 
 ```elixir
-content = tiny_resp["choices"] |> hd() |> get_in(["message", "content"])
+content = MistralUtils.extract_completion(resp_body)
 content |> IO.puts()
 ```
 
-<!-- livebook:{"offset":1957,"stamp":{"token":"XCP.Mfl_VhPKUCp9yK6p1_E_DT7A5hdcUz9-Sa93ePHM59FnZHGmyulq9NNfD7Cj5-Yr1PPdVAgrS5aLU9QbqKKyMLj-1LUQMrYYdQl_CQ9Y0rAdkUMaPBd3W9QR","version":2}} -->
+<!-- livebook:{"offset":11483,"stamp":{"token":"XCP.f1uTkqQTiWOFKLM9WYPJi1-JT_7TsY8WUPJ3mEJIIO--fDi8aAiVch05_AhHU3WVdQuBlZcHarLXjn3St6xxnX3AuHUqII5AcrzJfTBi_DNQH2y5q8u-U7LX","version":2}} -->
