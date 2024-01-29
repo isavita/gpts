@@ -76,7 +76,18 @@ end
 
 ## Add mutiple time FunctionRunner
 
-````elixir
+```elixir
+defmodule CodeResponseSanitizer do
+  def call(input) when is_binary(input) do
+    input
+    |> String.split("defmodule", parts: 2)
+    |> List.last()
+    |> String.split("end", parts: 2)
+    |> List.first()
+    |> (fn content -> "defmodule" <> content <> "end" end).()
+  end
+end
+
 defmodule FunctionRunner do
   def run_max_times(function, max_attempts) do
     do_run_max_times(function, max_attempts, 1)
@@ -98,7 +109,7 @@ task_solver_fn = fn day ->
   answer = Map.fetch!(day, "answer")
 
   with module_string <- OllamaClient.call("openhermes", task),
-       module_sanitized <- String.replace(module_string, ~r{```(elixir)?(\n)?}, ""),
+       module_sanitized <- CodeResponseSanitizer.call(module_string),
        {:ok, result} <- EvaluateCode.call(module_sanitized, input),
        true <- String.contains?(result, answer) do
     path =
@@ -109,10 +120,14 @@ task_solver_fn = fn day ->
     error -> error
   end
 end
-````
+```
 
 ```elixir
 Enum.map(dataset_2015, fn day ->
   FunctionRunner.run_max_times(fn -> task_solver_fn.(day) end, 3)
 end)
+```
+
+```elixir
+"fdsa defmodule A do func end end dfjskaldfjsl"
 ```
