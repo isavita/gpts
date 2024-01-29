@@ -1,0 +1,118 @@
+# Generate Advent Of Code solutions with LLM
+
+```elixir
+Mix.install([
+  :req,
+  :json,
+  :bumblebee
+])
+```
+
+## Load all advent of code from hugging face
+
+```elixir
+dataset_url = "https://huggingface.co/datasets/isavita/advent-of-code/raw/main/train.json"
+dataset = Req.get!(dataset_url).body |> Jason.decode!()
+```
+
+```elixir
+dataset_2015 = Enum.filter(dataset, &(&1["year"] == 2015 && &1["solution_lang"] == "go"))
+```
+
+## Manage Request to local ollama model
+
+```elixir
+defmodule OllamaClient do
+  # 5 mins
+  @timeout 300_000
+  @url "http://localhost:11434/api/generate"
+  @system_prompt """
+  You are an expert programmer that writes simple, concise code and no comments or explanation.
+  Write a elixir module that it reads its input from a file "input.txt" and solve the following task.
+  The module should have only one public function called `call` with arity 0.
+  TASK:
+  """
+  def call(model, task) do
+    prompt = "#{@system_prompt}#{task}"
+
+    payload =
+      Jason.encode!(%{
+        "model" => model,
+        "prompt" => prompt,
+        "stream" => false
+      })
+
+    Req.post!(@url, body: payload, receive_timeout: @timeout).body["response"]
+  end
+end
+```
+
+## Code evaluator
+
+```elixir
+defmodule EvaluateCode do
+  def call(code_string, file_content) do
+    try do
+      # Step 1: Evaluate the code_string to define the module
+      {{:module, module, _, _}, _binding} = Code.eval_string(code_string) |> IO.inspect()
+
+      # Step 2: Save the input file for the evaluation
+      File.write!("input.txt", file_content)
+
+      # Step 3: Check if the module and function call/0 exists and then invoke it
+      if module && function_exported?(module, :call, 0) do
+        result = apply(module, :call, [])
+        {:ok, inspect(result)}
+      else
+        {:error, "No suitable module with a public call/0 function found"}
+      end
+    rescue
+      exception ->
+        {:error, Exception.message(exception)}
+    end
+  end
+end
+```
+
+## Add mutiple time FunctionRunner
+
+````elixir
+defmodule FunctionRunner do
+  def run_max_times(function, max_attempts) do
+    do_run_max_times(function, max_attempts, 1)
+  end
+
+  defp do_run_max_times(function, max_attempts, attempt) when attempt <= max_attempts do
+    case function.() do
+      :ok -> :ok
+      _ -> do_run_max_times(function, max_attempts, attempt + 1)
+    end
+  end
+
+  defp do_run_max_times(_function, _max_attempts, _attempt), do: :error
+end
+
+task_solver_fn = fn day ->
+  task = Map.fetch!(day, "task")
+  input = Map.fetch!(day, "input")
+  answer = Map.fetch!(day, "answer")
+
+  with module_string <- OllamaClient.call("openhermes", task),
+       module_sanitized <- String.replace(module_string, ~r{```(elixir)?(\n)?}, ""),
+       {:ok, result} <- EvaluateCode.call(module_sanitized, input),
+       true <- String.contains?(result, answer) do
+    path =
+      ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}_#{:os.system_time()}.exs|
+
+    File.write!(path, module_sanitized)
+  else
+    error -> error
+  end
+end
+````
+
+```elixir
+Enum.map(dataset_2015, fn day ->
+  FunctionRunner.run_max_times(fn -> task_solver_fn.(day) end, 3)
+end)
+```
