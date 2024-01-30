@@ -4,8 +4,12 @@
 Mix.install([
   :req,
   :json,
-  :bumblebee
+  :bumblebee,
+  :wise_gpt_ex
 ])
+
+Application.put_env(:wise_gpt_ex, :openai_api_key, System.fetch_env!("LB_OPENAI_API_KEY"))
+Application.put_env(:wise_gpt_ex, :mistral_api_key, System.fetch_env!("LB_MISTRAL_API_KEY"))
 ```
 
 ## Load all advent of code from hugging face
@@ -16,7 +20,98 @@ dataset = Req.get!(dataset_url).body |> Jason.decode!()
 ```
 
 ```elixir
-dataset_2015 = Enum.filter(dataset, &(&1["year"] == 2015 && &1["solution_lang"] == "go"))
+dataset_2016 = Enum.filter(dataset, &(&1["year"] == 2016 && &1["solution_lang"] == "go"))
+```
+
+## Manage Request to Mistral API
+
+```elixir
+defmodule MistralClient do
+  # 5 mins
+  @timeout 300_000
+  @url "https://api.mistral.ai/v1/chat/completions"
+  @system_prompt """
+  You are an expert programmer that writes simple, concise code and no comments or explanation.
+  Write a elixir module that it reads its input from a file "input.txt" and solve the following task.
+  The module should have only one public function called `call` with arity 0.
+  TASK:
+  """
+  def call(model, task) do
+    prompt = "#{@system_prompt}#{task}"
+
+    payload =
+      %{
+        "model" => model,
+        "messages" => [
+          %{"role" => "user", "content" => prompt}
+        ],
+        "temperature" => 0.1,
+        "stream" => false
+      }
+      |> Jason.encode!()
+
+    Req.post!(@url, body: payload, headers: headers(), receive_timeout: @timeout).body
+    |> Map.get("choices", [%{}])
+    |> hd()
+    |> get_in(["message", "content"])
+  end
+
+  defp headers do
+    [
+      {"Content-Type", "application/json"},
+      {"Accept", "application/json"},
+      {"Authorization", "Bearer " <> mistral_api_key()}
+    ]
+  end
+
+  defp mistral_api_key, do: System.fetch_env!("LB_MISTRAL_API_KEY")
+end
+```
+
+```elixir
+defmodule OpenAIClient do
+  # 5 mins
+  @timeout 300_000
+  @url "https://api.openai.com/v1/chat/completions"
+  @system_prompt """
+  You are an expert programmer that writes simple, concise code and no comments or explanation.
+  Write a elixir module that it reads its input from a file "input.txt" and solve the following task.
+  The module should have only one public function called `call` with arity 0.
+  TASK:
+  """
+  def call(model, task) do
+    prompt = "#{@system_prompt}#{task}"
+
+    payload =
+      %{
+        "model" => model,
+        "temperature" => 0.1,
+        "messages" => [
+          %{"role" => "user", "content" => prompt}
+        ]
+      }
+      |> Jason.encode!()
+
+    Req.post!(@url, body: payload, headers: headers(), receive_timeout: @timeout).body
+    |> Map.get("choices", [%{}])
+    |> hd()
+    |> get_in(["message", "content"])
+  end
+
+  defp headers do
+    [
+      {"authorization", "Bearer #{openai_api_key()}"},
+      {"content-type", "application/json"},
+      {"accept", "application/json"}
+    ]
+  end
+
+  defp openai_api_key, do: System.fetch_env!("LB_OPENAI_API_KEY")
+end
+```
+
+```elixir
+OpenAIClient.call("gpt-4-turbo-preview", "reverse a string for me")
 ```
 
 ## Manage Request to local ollama model
@@ -54,7 +149,7 @@ defmodule EvaluateCode do
   def call(code_string, file_content) do
     try do
       # Step 1: Evaluate the code_string to define the module
-      {{:module, module, _, _}, _binding} = Code.eval_string(code_string) |> IO.inspect()
+      {{:module, module, _, _}, _binding} = Code.eval_string(code_string)
 
       # Step 2: Save the input file for the evaluation
       File.write!("input.txt", file_content)
@@ -76,15 +171,12 @@ end
 
 ## Add mutiple time FunctionRunner
 
-```elixir
+````elixir
 defmodule CodeResponseSanitizer do
   def call(input) when is_binary(input) do
     input
-    |> String.split("defmodule", parts: 2)
-    |> List.last()
-    |> String.split("end", parts: 2)
-    |> List.first()
-    |> (fn content -> "defmodule" <> content <> "end" end).()
+    |> String.replace(~r/^(\n|.)*```elixir/, "")
+    |> String.replace(~r/```(\n|.)*$/, "")
   end
 end
 
@@ -108,26 +200,28 @@ task_solver_fn = fn day ->
   input = Map.fetch!(day, "input")
   answer = Map.fetch!(day, "answer")
 
-  with module_string <- OllamaClient.call("openhermes", task),
-       module_sanitized <- CodeResponseSanitizer.call(module_string),
-       {:ok, result} <- EvaluateCode.call(module_sanitized, input),
-       true <- String.contains?(result, answer) do
+  with module_string <- OpenAIClient.call("gpt-4-turbo-preview", task) |> IO.inspect(label: 1),
+       module_sanitized <- CodeResponseSanitizer.call(module_string) |> IO.inspect(label: 2),
+       {:ok, result} <- EvaluateCode.call(module_sanitized, input) |> IO.inspect(label: 2),
+       true <- String.contains?(result, answer) |> IO.inspect(label: 4) do
     path =
-      ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}_#{:os.system_time()}.exs|
+      ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}.exs|
 
-    File.write!(path, module_sanitized)
+    File.write!(path, module_sanitized) |> IO.inspect(label: 5)
   else
     error -> error
   end
 end
-```
+````
+
+````elixir
+"Here's the Elixir module that solves the task:\n\n```elixir\ndefmodule Day1 do\n  def call do\n    File.read!(\"input.txt\")\n    |> chars()\n  "
+````
 
 ```elixir
-Enum.map(dataset_2015, fn day ->
+Enum.map(dataset_2016, fn day ->
   FunctionRunner.run_max_times(fn -> task_solver_fn.(day) end, 3)
 end)
 ```
 
-```elixir
-"fdsa defmodule A do func end end dfjskaldfjsl"
-```
+<!-- livebook:{"offset":6140,"stamp":{"token":"XCP.LugqWEUcBGlzxwkS9tKm5xU6rFXbEZ0ujADfTLqtEdkd_Qoz70GeugbWvQUVe08FQQzaJPqoJLLhGFkSQ1L-vG9T6eb4aMnDqxbRX4V_rwTsPm7YUlvxXWQp8NWurLamUeK5_A3MrNITD3q5gg","version":2}} -->
