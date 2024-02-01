@@ -3,13 +3,8 @@
 ```elixir
 Mix.install([
   :req,
-  :json,
-  :bumblebee,
-  :wise_gpt_ex
+  :json
 ])
-
-Application.put_env(:wise_gpt_ex, :openai_api_key, System.fetch_env!("LB_OPENAI_API_KEY"))
-Application.put_env(:wise_gpt_ex, :mistral_api_key, System.fetch_env!("LB_MISTRAL_API_KEY"))
 ```
 
 ## Load all advent of code from hugging face
@@ -20,7 +15,14 @@ dataset = Req.get!(dataset_url).body |> Jason.decode!()
 ```
 
 ```elixir
-dataset_2016 = Enum.filter(dataset, &(&1["year"] == 2016 && &1["solution_lang"] == "go"))
+solutions = File.ls!("#{File.cwd!()}/code/advent_generated")
+solved_parts = Enum.map(solutions, &String.replace(&1, ".exs", ""))
+
+dataset_201X =
+  Enum.filter(dataset, fn part ->
+    part["year"] in [2015, 2016, 2017, 2018, 2019] && part["solution_lang"] == "go" &&
+      part["name"] not in solved_parts
+  end)
 ```
 
 ## Manage Request to Mistral API
@@ -111,7 +113,44 @@ end
 ```
 
 ```elixir
-OpenAIClient.call("gpt-4-turbo-preview", "reverse a string for me")
+defmodule RunWithTimeout do
+  def call(fun, timeout) do
+    task =
+      Task.async(fn ->
+        try do
+          # Attempt to run the function
+          result = fun.()
+          {:ok, result}
+        rescue
+          exception ->
+            # If an exception occurs, return an error tuple
+            {:error, Exception.message(exception)}
+        end
+      end)
+
+    try do
+      Task.await(task, timeout)
+    rescue
+      # Catches exceptions and converts them to a tuple
+      exception ->
+        {:error, Exception.message(exception)}
+    catch
+      # Catches exits such as those from Task.await timeout
+      :exit, _ ->
+        # Ensures that the task is not left running
+        Task.shutdown(task, :brutal_kill)
+        {:error, "The operation timed out."}
+
+      # Catches throws, which are non-standard in Elixir but still possible
+      :throw, value ->
+        {:error, "The operation was aborted: #{inspect(value)}"}
+    end
+  end
+end
+```
+
+```elixir
+RunWithTimeout.call(fn -> Process.slleep() end, 500)
 ```
 
 ## Manage Request to local ollama model
@@ -156,7 +195,7 @@ defmodule EvaluateCode do
 
       # Step 3: Check if the module and function call/0 exists and then invoke it
       if module && function_exported?(module, :call, 0) do
-        result = apply(module, :call, [])
+        result = RunWithTimeout.call(fn -> apply(module, :call, []) end, 20_000)
         {:ok, inspect(result)}
       else
         {:error, "No suitable module with a public call/0 function found"}
@@ -200,9 +239,10 @@ task_solver_fn = fn day ->
   input = Map.fetch!(day, "input")
   answer = Map.fetch!(day, "answer")
 
-  with module_string <- OpenAIClient.call("gpt-4-turbo-preview", task) |> IO.inspect(label: 1),
-       module_sanitized <- CodeResponseSanitizer.call(module_string) |> IO.inspect(label: 2),
-       {:ok, result} <- EvaluateCode.call(module_sanitized, input) |> IO.inspect(label: 2),
+  # "gpt-4-turbo-preview"
+  with module_string <- OpenAIClient.call("gpt-3.5-turbo-0125", task),
+       module_sanitized <- CodeResponseSanitizer.call(module_string),
+       {:ok, result} <- EvaluateCode.call(module_sanitized, input),
        true <- String.contains?(result, answer) |> IO.inspect(label: 4) do
     path =
       ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}.exs|
@@ -214,14 +254,10 @@ task_solver_fn = fn day ->
 end
 ````
 
-````elixir
-"Here's the Elixir module that solves the task:\n\n```elixir\ndefmodule Day1 do\n  def call do\n    File.read!(\"input.txt\")\n    |> chars()\n  "
-````
-
 ```elixir
-Enum.map(dataset_2016, fn day ->
-  FunctionRunner.run_max_times(fn -> task_solver_fn.(day) end, 3)
+Enum.map(dataset_201X, fn day ->
+  FunctionRunner.run_max_times(fn -> task_solver_fn.(day) end, 2)
 end)
 ```
 
-<!-- livebook:{"offset":6140,"stamp":{"token":"XCP.LugqWEUcBGlzxwkS9tKm5xU6rFXbEZ0ujADfTLqtEdkd_Qoz70GeugbWvQUVe08FQQzaJPqoJLLhGFkSQ1L-vG9T6eb4aMnDqxbRX4V_rwTsPm7YUlvxXWQp8NWurLamUeK5_A3MrNITD3q5gg","version":2}} -->
+<!-- livebook:{"offset":6929,"stamp":{"token":"XCP.k44NxneJ7OAOiDDbLq8mNX_aDq-piG7Jl6Zdom4KcayqMQcGgYYMit_SeyBjrwlNMWQNHAsr1MxkgN11rBtdao6iqfZdVFM48vBpNi4tm56oEt55TYHtiMxUW9NNGzKs9NnFPTrEYP1Ys2VX0A","version":2}} -->
