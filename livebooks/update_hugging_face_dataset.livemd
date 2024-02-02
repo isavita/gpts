@@ -1,0 +1,56 @@
+# Add more solutions
+
+```elixir
+Mix.install([
+  :req,
+  :jason
+])
+```
+
+## Load all advent of code from hugging face
+
+```elixir
+dataset_url = "https://huggingface.co/datasets/isavita/advent-of-code/raw/main/train.json"
+dataset = Req.get!(dataset_url).body |> Jason.decode!()
+
+dataset =
+  dataset
+  |> Enum.sort_by(&{&1["year"], String.length(&1["name"]), &1["name"]})
+```
+
+```elixir
+new_solutions_path = ~s|#{System.get_env("HOME")}/code/advent_generated/|
+lang_ext = ".exs"
+lang = "elixir"
+
+data =
+  Enum.reduce(dataset, [], fn solution, acc ->
+    acc = [solution | acc]
+
+    if solution["solution_lang"] == "go" do
+      path = new_solutions_path <> solution["name"] <> lang_ext
+
+      case File.read(path) do
+        {:ok, new_solution} ->
+          new_solution = String.trim(new_solution)
+
+          if Enum.all?(dataset, fn s -> s["solution"] != new_solution end) do
+            [%{solution | "solution_lang" => lang, "solution" => new_solution} | acc]
+          else
+            acc
+          end
+
+        _ ->
+          acc
+      end
+    else
+      acc
+    end
+  end)
+  |> Enum.reverse()
+```
+
+```elixir
+output_path = "#{File.cwd!()}/git/advent-of-code/train.json"
+File.write(output_path, Jason.encode!(data))
+```

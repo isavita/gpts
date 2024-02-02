@@ -18,10 +18,10 @@ dataset = Req.get!(dataset_url).body |> Jason.decode!()
 solutions = File.ls!("#{File.cwd!()}/code/advent_generated")
 solved_parts = Enum.map(solutions, &String.replace(&1, ".exs", ""))
 
-dataset_201X =
+dataset_202X =
   Enum.filter(dataset, fn part ->
-    part["year"] in [2015, 2016, 2017, 2018, 2019] && part["solution_lang"] == "go" &&
-      part["name"] not in solved_parts
+    String.contains?(part["name"], ["day10_", "day11_", "day12_", "day13_", "day14_", "day15_"]) &&
+      part["year"] <= 2027 && part["solution_lang"] == "go" && part["name"] not in solved_parts
   end)
 ```
 
@@ -36,6 +36,7 @@ defmodule MistralClient do
   You are an expert programmer that writes simple, concise code and no comments or explanation.
   Write a elixir module that it reads its input from a file "input.txt" and solve the following task.
   The module should have only one public function called `call` with arity 0.
+  The answer should be RETURN instead of printed in the stdout.
   TASK:
   """
   def call(model, task) do
@@ -70,15 +71,70 @@ defmodule MistralClient do
 end
 ```
 
-```elixir
+````elixir
 defmodule OpenAIClient do
-  # 5 mins
-  @timeout 300_000
+  # 10 mins
+  @timeout 600_000
   @url "https://api.openai.com/v1/chat/completions"
   @system_prompt """
   You are an expert programmer that writes simple, concise code and no comments or explanation.
   Write a elixir module that it reads its input from a file "input.txt" and solve the following task.
   The module should have only one public function called `call` with arity 0.
+  The answer should be RETURN instead of printed in the stdout.
+  HERE ARE SOME IMPLEMENTATION that you can copy and paste and add to your code of helpful functions:
+  ```
+  defp min(a, b) do
+    if a < b, do: a, else: b
+  end
+
+  defp max(a, b) do
+    if a > b, do: a, else: b
+  end
+
+  defp string_replace_at(original, index, replacement) do
+    {head, tail} = String.split_at(original, index)
+    replacement_length = String.length(replacement)
+
+    head <> replacement <> String.slice(tail, replacement_length, String.length(tail) - replacement_length)
+  end
+
+    iex> String.graphemes("Ńaïve")
+    ["Ń", "a", "ï", "v", "e"]
+
+
+  # Depth First Search function
+  defp dfs(graph, start_node) do
+    dfs_recursive(graph, start_node, MapSet.new(), [])
+  end
+
+  # Recursive helper function for DFS
+  defp dfs_recursive(graph, current_node, visited, path) do
+    if MapSet.member?(visited, current_node) do
+      {visited, path}
+    else
+      new_visited = MapSet.put(visited, current_node)
+      new_path = [current_node | path]
+
+      Enum.reduce(graph[current_node] || [], {new_visited, new_path}, fn neighbor, {vis, pth} ->
+        dfs_recursive(graph, neighbor, vis, pth)
+      end)
+    end
+  end
+
+  # Breadth First Search function
+  defp bfs(graph, start_node) do
+    bfs_queue([start_node], MapSet.new([start_node]), graph, [])
+  end
+
+  defp bfs_queue([], _visited, _graph, acc), do: Enum.reverse(acc)
+
+  defp bfs_queue([current_node | rest], visited, graph, acc) do
+    neighbors = graph[current_node] || []
+    unvisited_neighbors = Enum.filter(neighbors, &(!MapSet.member?(visited, &1)))
+    new_visited = Enum.reduce(unvisited_neighbors, visited, &MapSet.put(&2, &1))
+    bfs_queue(rest ++ unvisited_neighbors, new_visited, graph, [current_node | acc])
+  end
+  ```
   TASK:
   """
   def call(model, task) do
@@ -110,7 +166,7 @@ defmodule OpenAIClient do
 
   defp openai_api_key, do: System.fetch_env!("LB_OPENAI_API_KEY")
 end
-```
+````
 
 ```elixir
 defmodule RunWithTimeout do
@@ -164,6 +220,7 @@ defmodule OllamaClient do
   You are an expert programmer that writes simple, concise code and no comments or explanation.
   Write a elixir module that it reads its input from a file "input.txt" and solve the following task.
   The module should have only one public function called `call` with arity 0.
+  The answer should be RETURN instead of printed in the stdout.
   TASK:
   """
   def call(model, task) do
@@ -205,6 +262,26 @@ defmodule EvaluateCode do
         {:error, Exception.message(exception)}
     end
   end
+
+  defp capture_io(module) do
+    old_group_leader = Process.group_leader()
+    {:ok, capture_pid} = StringIO.open("")
+    Process.group_leader(self(), capture_pid)
+
+    try do
+      result = apply(module, :call, [])
+      captured_output = capture_output(capture_pid)
+      {:ok, {result, captured_output}}
+    rescue
+      e in [RuntimeError, ArgumentError] -> {:error, Exception.message(e)}
+    after
+      Process.group_leader(self(), old_group_leader)
+    end
+  end
+
+  defp capture_output(pid) do
+    StringIO.flush(pid)
+  end
 end
 ```
 
@@ -239,7 +316,7 @@ task_solver_fn = fn day ->
   input = Map.fetch!(day, "input")
   answer = Map.fetch!(day, "answer")
 
-  # "gpt-4-turbo-preview"
+  # "gpt-4-turbo-preview" OllamaClient.call("deepseek-coder:6.7b", task) 
   with module_string <- OpenAIClient.call("gpt-3.5-turbo-0125", task),
        module_sanitized <- CodeResponseSanitizer.call(module_string),
        {:ok, result} <- EvaluateCode.call(module_sanitized, input),
@@ -255,9 +332,9 @@ end
 ````
 
 ```elixir
-Enum.map(dataset_201X, fn day ->
+Enum.map([], fn day ->
   FunctionRunner.run_max_times(fn -> task_solver_fn.(day) end, 2)
 end)
 ```
 
-<!-- livebook:{"offset":6929,"stamp":{"token":"XCP.k44NxneJ7OAOiDDbLq8mNX_aDq-piG7Jl6Zdom4KcayqMQcGgYYMit_SeyBjrwlNMWQNHAsr1MxkgN11rBtdao6iqfZdVFM48vBpNi4tm56oEt55TYHtiMxUW9NNGzKs9NnFPTrEYP1Ys2VX0A","version":2}} -->
+<!-- livebook:{"offset":9476,"stamp":{"token":"XCP.omcK9IGpCxKWz3vu43NYWgfJVNQCelX7c7Z7pnjx_Tnd1_gS2GPAs5EwsGrtJGHF_RGHIbrIsScwK1pFNlhEEBOuRzurub7BFxLQezREQ3WQ3E15iimrcnG3Zon1oyG4b3zTF7YF8NqqftB7zg","version":2}} -->
