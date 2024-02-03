@@ -10,25 +10,27 @@ Mix.install([
 ## Load all advent of code from hugging face
 
 ```elixir
-dataset_url = "https://huggingface.co/datasets/isavita/advent-of-code/raw/main/train.json"
-dataset = Req.get!(dataset_url).body |> Jason.decode!()
+dataset_url = "https://huggingface.co/datasets/isavita/advent-of-code/resolve/main/train.json"
+dataset = Req.get!(dataset_url).body
 
 dataset =
   dataset
   |> Enum.sort_by(&{&1["year"], String.length(&1["name"]), &1["name"]})
+
+Enum.count(dataset)
 ```
 
 ```elixir
 new_solutions_path = ~s|#{System.get_env("HOME")}/code/advent_generated/|
-lang_ext = ".exs"
-lang = "elixir"
+lang_ext = ".pl"
+lang = "perl"
 
 data =
   Enum.reduce(dataset, [], fn solution, acc ->
     acc = [solution | acc]
 
     if solution["solution_lang"] == "go" do
-      path = new_solutions_path <> solution["name"] <> lang_ext
+      path = (new_solutions_path <> solution["name"] <> lang_ext) |> IO.inspect()
 
       case File.read(path) do
         {:ok, new_solution} ->
@@ -48,6 +50,10 @@ data =
     end
   end)
   |> Enum.reverse()
+```
+
+```elixir
+{Enum.count(dataset), Enum.count(data)}
 ```
 
 ```elixir

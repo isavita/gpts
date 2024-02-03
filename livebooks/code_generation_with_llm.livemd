@@ -10,18 +10,25 @@ Mix.install([
 ## Load all advent of code from hugging face
 
 ```elixir
-dataset_url = "https://huggingface.co/datasets/isavita/advent-of-code/raw/main/train.json"
-dataset = Req.get!(dataset_url).body |> Jason.decode!()
+dataset_url = "https://huggingface.co/datasets/isavita/advent-of-code/resolve/main/train.json"
+dataset = Req.get!(dataset_url).body
+```
+
+```elixir
+defmodule Constants do
+  def file_ext, do: ".lua"
+  def lang, do: "lua"
+  def runtime, do: "lua"
+end
 ```
 
 ```elixir
 solutions = File.ls!("#{File.cwd!()}/code/advent_generated")
-solved_parts = Enum.map(solutions, &String.replace(&1, ".exs", ""))
+solved_parts = Enum.map(solutions, &String.replace(&1, Constants.file_ext(), ""))
 
 dataset_202X =
   Enum.filter(dataset, fn part ->
-    String.contains?(part["name"], ["day10_", "day11_", "day12_", "day13_", "day14_", "day15_"]) &&
-      part["year"] <= 2027 && part["solution_lang"] == "go" && part["name"] not in solved_parts
+    part["year"] > 2015 && part["solution_lang"] == "go" && part["name"] not in solved_parts
   end)
 ```
 
@@ -137,8 +144,8 @@ defmodule OpenAIClient do
   ```
   TASK:
   """
-  def call(model, task) do
-    prompt = "#{@system_prompt}#{task}"
+  def call(model, task, system_prompt \\ @system_prompt) do
+    prompt = "#{system_prompt}#{task}"
 
     payload =
       %{
@@ -195,12 +202,30 @@ defmodule RunWithTimeout do
       :exit, _ ->
         # Ensures that the task is not left running
         Task.shutdown(task, :brutal_kill)
+
+        {output, _} =
+          System.cmd("pgrep", ["-f", "test#{Constants.file_ext()}"], stderr_to_stdout: true)
+          |> IO.inspect(label: "kill")
+
+        kill_os_process(output) |> IO.inspect(label: "kill")
         {:error, "The operation timed out."}
 
       # Catches throws, which are non-standard in Elixir but still possible
       :throw, value ->
         {:error, "The operation was aborted: #{inspect(value)}"}
     end
+  end
+
+  defp kill_os_process(output) do
+    Enum.each(String.split(output, "\n"), fn pid ->
+      # Ignore empty lines
+      if pid != "" do
+        # Kill each process found
+        System.cmd("kill", [pid])
+      else
+        :ok
+      end
+    end)
   end
 end
 ```
@@ -242,45 +267,24 @@ end
 
 ```elixir
 defmodule EvaluateCode do
-  def call(code_string, file_content) do
+  def call(code, file_content) do
     try do
-      # Step 1: Evaluate the code_string to define the module
-      {{:module, module, _, _}, _binding} = Code.eval_string(code_string)
-
-      # Step 2: Save the input file for the evaluation
+      File.write!("test#{Constants.file_ext()}", code)
       File.write!("input.txt", file_content)
 
-      # Step 3: Check if the module and function call/0 exists and then invoke it
-      if module && function_exported?(module, :call, 0) do
-        result = RunWithTimeout.call(fn -> apply(module, :call, []) end, 20_000)
+      {result, exit_status} =
+        System.cmd(Constants.runtime(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
+        |> IO.inspect()
+
+      if exit_status == 0 do
         {:ok, inspect(result)}
       else
-        {:error, "No suitable module with a public call/0 function found"}
+        {:error, "Error status #{exit_status}"}
       end
     rescue
       exception ->
         {:error, Exception.message(exception)}
     end
-  end
-
-  defp capture_io(module) do
-    old_group_leader = Process.group_leader()
-    {:ok, capture_pid} = StringIO.open("")
-    Process.group_leader(self(), capture_pid)
-
-    try do
-      result = apply(module, :call, [])
-      captured_output = capture_output(capture_pid)
-      {:ok, {result, captured_output}}
-    rescue
-      e in [RuntimeError, ArgumentError] -> {:error, Exception.message(e)}
-    after
-      Process.group_leader(self(), old_group_leader)
-    end
-  end
-
-  defp capture_output(pid) do
-    StringIO.flush(pid)
   end
 end
 ```
@@ -291,7 +295,7 @@ end
 defmodule CodeResponseSanitizer do
   def call(input) when is_binary(input) do
     input
-    |> String.replace(~r/^(\n|.)*```elixir/, "")
+    |> String.replace(~r/^(\n|.)*```#{Constants.lang()}/, "")
     |> String.replace(~r/```(\n|.)*$/, "")
   end
 end
@@ -312,17 +316,32 @@ defmodule FunctionRunner do
 end
 
 task_solver_fn = fn day ->
-  task = Map.fetch!(day, "task")
+  # task = Map.fetch!(day, "task")
   input = Map.fetch!(day, "input")
   answer = Map.fetch!(day, "answer")
+  solution = Map.fetch!(day, "solution")
+
+  # system_prompt = """
+  # You are an expert programmer that writes simple, concise code and no comments or explanation.
+  # Write a #{Constants.file_ext()} script that it reads its input from a file "input.txt" and solve the following task.
+  # The answer should puts the answer as result of running the `#{Constants.runtime()} script#{Constants.file_ext()}`.
+  # """
+
+  system_prompt = """
+  You are an expert programmer that writes simple, concise code and no comments or explanation.
+  Given this golang program write a #{Constants.file_ext()} version that it reads its input from a file "input.txt" and solve the following task.
+  The answer should print the answer on the stdout and can be run `#{Constants.runtime()} solution#{Constants.file_ext()}`.
+
+  Golang Task:
+  """
 
   # "gpt-4-turbo-preview" OllamaClient.call("deepseek-coder:6.7b", task) 
-  with module_string <- OpenAIClient.call("gpt-3.5-turbo-0125", task),
+  with module_string <- OpenAIClient.call("gpt-3.5-turbo-0125", solution, system_prompt),
        module_sanitized <- CodeResponseSanitizer.call(module_string),
        {:ok, result} <- EvaluateCode.call(module_sanitized, input),
        true <- String.contains?(result, answer) |> IO.inspect(label: 4) do
     path =
-      ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}.exs|
+      ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}#{Constants.file_ext()}|
 
     File.write!(path, module_sanitized) |> IO.inspect(label: 5)
   else
@@ -332,9 +351,13 @@ end
 ````
 
 ```elixir
-Enum.map([], fn day ->
-  FunctionRunner.run_max_times(fn -> task_solver_fn.(day) end, 2)
+System.cmd("lua", ["/Users/isavita/code/advent_generated/test.lua"], stderr_to_stdout: true)
+```
+
+```elixir
+Enum.map(dataset_202X, fn day ->
+  FunctionRunner.run_max_times(fn -> task_solver_fn.(day) end, 1)
 end)
 ```
 
-<!-- livebook:{"offset":9476,"stamp":{"token":"XCP.omcK9IGpCxKWz3vu43NYWgfJVNQCelX7c7Z7pnjx_Tnd1_gS2GPAs5EwsGrtJGHF_RGHIbrIsScwK1pFNlhEEBOuRzurub7BFxLQezREQ3WQ3E15iimrcnG3Zon1oyG4b3zTF7YF8NqqftB7zg","version":2}} -->
+<!-- livebook:{"offset":10239,"stamp":{"token":"XCP.JojWV1-28u0KNJlVPsYP6PpBRalw8AMFdH9fs3RSFJupQX7eNrMt6jgMJt6o4S3BsYJFpYICpeJx8CIpsEm9kY-oA4XR68uguWdyju-qcxVb67Ig-HvFoTvsrPdhs2nYINxKB7CIXhD77kZJsA","version":2}} -->
