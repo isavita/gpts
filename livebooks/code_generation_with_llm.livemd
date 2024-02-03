@@ -18,7 +18,7 @@ dataset = Req.get!(dataset_url).body
 defmodule Constants do
   def file_ext, do: ".lua"
   def lang, do: "lua"
-  def runtime, do: "lua"
+  def runtime, do: "/opt/homebrew/bin/lua"
 end
 ```
 
@@ -28,7 +28,7 @@ solved_parts = Enum.map(solutions, &String.replace(&1, Constants.file_ext(), "")
 
 dataset_202X =
   Enum.filter(dataset, fn part ->
-    part["year"] > 2015 && part["solution_lang"] == "go" && part["name"] not in solved_parts
+    part["solution_lang"] == "go" && part["name"] not in solved_parts
   end)
 ```
 
@@ -150,7 +150,7 @@ defmodule OpenAIClient do
     payload =
       %{
         "model" => model,
-        "temperature" => 0.1,
+        "temperature" => 0.9,
         "messages" => [
           %{"role" => "user", "content" => prompt}
         ]
@@ -231,7 +231,7 @@ end
 ```
 
 ```elixir
-RunWithTimeout.call(fn -> Process.slleep() end, 500)
+RunWithTimeout.call(fn -> 3 end, 500)
 ```
 
 ## Manage Request to local ollama model
@@ -269,12 +269,20 @@ end
 defmodule EvaluateCode do
   def call(code, file_content) do
     try do
-      File.write!("test#{Constants.file_ext()}", code)
+      File.write!("test#{Constants.file_ext()}", code |> IO.inspect(label: "code"))
       File.write!("input.txt", file_content)
 
-      {result, exit_status} =
-        System.cmd(Constants.runtime(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
-        |> IO.inspect()
+      {:ok, {result, exit_status}} =
+        RunWithTimeout.call(
+          fn ->
+            System.cmd(Constants.runtime(), ["test#{Constants.file_ext()}"],
+              stderr_to_stdout: true
+            )
+            |> IO.inspect(label: "run")
+          end,
+          10_000
+        )
+        |> IO.inspect(label: "here")
 
       if exit_status == 0 do
         {:ok, inspect(result)}
@@ -351,7 +359,9 @@ end
 ````
 
 ```elixir
-System.cmd("lua", ["/Users/isavita/code/advent_generated/test.lua"], stderr_to_stdout: true)
+System.cmd(Constants.runtime(), ["/Users/isavita/code/advent_generated/test.lua"],
+  stderr_to_stdout: true
+)
 ```
 
 ```elixir
@@ -360,4 +370,4 @@ Enum.map(dataset_202X, fn day ->
 end)
 ```
 
-<!-- livebook:{"offset":10239,"stamp":{"token":"XCP.JojWV1-28u0KNJlVPsYP6PpBRalw8AMFdH9fs3RSFJupQX7eNrMt6jgMJt6o4S3BsYJFpYICpeJx8CIpsEm9kY-oA4XR68uguWdyju-qcxVb67Ig-HvFoTvsrPdhs2nYINxKB7CIXhD77kZJsA","version":2}} -->
+<!-- livebook:{"offset":10443,"stamp":{"token":"XCP.s6mWT_xP6d079bu67YRoeAgPBM6Vv5qgCqwTpqx7iv97olQ6J4yhL0kVDw7L-Mv-lmVsgK8ZuFLxsZYp_QzPQbqsSlrw4pIgP4r0jcTkJwFT1B9PVXon6eRE1PDlRhDAjZDK538mN2UkCoPqgw","version":2}} -->
