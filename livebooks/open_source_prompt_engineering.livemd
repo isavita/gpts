@@ -1,0 +1,81 @@
+# OpenSource LLMs Prompt Engineering
+
+```elixir
+Mix.install([
+  :req,
+  :jason
+])
+```
+
+## Ollama API Locally
+
+```elixir
+defmodule Ollama do
+  @timeout 300_000
+  @url "http://localhost:11434/api/generate"
+
+  def call(model, prompt) do
+    payload =
+      Jason.encode!(%{
+        "model" => model,
+        "prompt" => prompt,
+        "stream" => false
+      })
+
+    resp = Req.post!(@url, body: payload, receive_timeout: @timeout)
+
+    if resp.status == 200 do
+      resp.body["response"]
+    else
+      inspect(resp.body)
+    end
+  end
+end
+```
+
+## Main points for promting LLMs
+
+1. How the LLM was finetuned and packaged behind an API impacts how to prompt it.
+2. Different LLMs & LLM versions mean different prompts.
+3. Prompting is not software engineering. It's closer to googling.
+4. Prompts are just a strings. Do not overcomplicate it.
+5. RAG is prompt-engineering. Do not overcomplicate it. It just concatenates strings and adds them to the prompt.
+
+## Let's start with memorable anology
+
+You go out every day with pants on. You see everyone wearing pants. You're told it's right to wear pants. You are a good person for wearing pants.
+
+Every day, you act normal, because you wear pants.
+
+Then, one day, you go out and you're not wearing pants.
+
+**Do you still act normal?**
+
+**Note:** "Wearing pants" is an anology for Prompt Setting.
+
+## Prompt Setting Mistral
+
+```elixir
+prompt = "Respond kindly to the child: i really hate zucchini. why should i eat it?"
+
+# prompt setting
+# <s>[INST]{text}[/INST]
+prompt_with_setting = "<s>[INST] #{prompt} [/INST]"
+
+Ollama.call("mistral", prompt)
+|> IO.puts()
+```
+
+## Prompt Setting LLama2
+
+```elixir
+prompt = "You are a healths food nut. I'm drinking green juice"
+
+# <s>[INST]<<SYS>>\n{system_text}<</SYS>>\n{text}[/INST]
+sys_prompt = "You are a healths food nut."
+prompt = "I'm drinking green juice"
+prompt_with_setting = "<s>[INST]<<SYS>>\n#{sys_prompt}<</SYS>>\n#{prompt}[/INST]"
+
+Ollama.call("llama2:7b", prompt_with_setting)
+|> IO.puts()
+```
