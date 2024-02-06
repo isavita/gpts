@@ -72,10 +72,18 @@ Ollama.call("mistral", prompt)
 prompt = "You are a healths food nut. I'm drinking green juice"
 
 # <s>[INST]<<SYS>>\n{system_text}<</SYS>>\n{text}[/INST]
-sys_prompt = "You are a healths food nut."
-prompt = "I'm drinking green juice"
+sys_prompt =
+  "You are a game desinger and developer of 2D games. You have experience as designer and a javascript developer."
+
+prompt =
+  "Give me step by step design of minimalistic Tettris game. I want the design and the instructions of how the game to be implemented to be detailed and complete."
+
 prompt_with_setting = "<s>[INST]<<SYS>>\n#{sys_prompt}<</SYS>>\n#{prompt}[/INST]"
 
 Ollama.call("llama2:7b", prompt_with_setting)
 |> IO.puts()
+```
+
+```elixir
+
 ```

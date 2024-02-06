@@ -22,8 +22,8 @@ Enum.count(dataset)
 
 ```elixir
 new_solutions_path = ~s|#{System.get_env("HOME")}/code/advent_generated/|
-lang_ext = ".php"
-lang = "php"
+lang_ext = ".c"
+lang = "c"
 
 data =
   Enum.reduce(dataset, [], fn solution, acc ->
