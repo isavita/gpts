@@ -16,29 +16,24 @@ dataset = Req.get!(dataset_url).body
 
 ```elixir
 defmodule Constants do
-  def file_ext, do: ".cpp"
-  def lang, do: "cpp"
-  def compiler, do: "/usr/bin/g++"
-  def runtime, do: "/Users/isavita/test"
+  def file_ext, do: ".ts"
+  def lang, do: "typescript"
+  def compiler, do: "/Users/isavita/.nvm/versions/node/v19.8.1/bin/tsc"
+  def runtime, do: "/Users/isavita/.nvm/versions/node/v19.8.1/bin/node"
 end
+
+Constants.compiler()
 ```
 
 ```elixir
 program = ~S|
-#include <iostream>
-
-int main() {
-    std::cout << "Hello, World!" << std::endl;
-    return 0;
-}
+console.log(42);
 |
+
 File.write!("test#{Constants.file_ext()}", program)
-
-System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}", "-std=c++11", "-o", "test"],
-  stderr_to_stdout: true
-)
-
-System.cmd(Constants.runtime(), [], stderr_to_stdout: true)
+# System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
+# System.cmd("/Users/isavita/.nvm/versions/node/v19.8.1/bin/node", ["--version"])
+System.cmd(Constants.runtime(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
 ```
 
 ```elixir
@@ -65,8 +60,8 @@ defmodule MistralClient do
   The answer should be RETURN instead of printed in the stdout.
   TASK:
   """
-  def call(model, task) do
-    prompt = "#{@system_prompt}#{task}"
+  def call(model, task, system_prompt \\ @system_prompt) do
+    prompt = "#{system_prompt}\n#{task}"
 
     payload =
       %{
@@ -74,7 +69,7 @@ defmodule MistralClient do
         "messages" => [
           %{"role" => "user", "content" => prompt}
         ],
-        "temperature" => 0.1,
+        "temperature" => 0.3,
         "stream" => false
       }
       |> Jason.encode!()
@@ -169,7 +164,7 @@ defmodule OpenAIClient do
     payload =
       %{
         "model" => model,
-        "temperature" => 0.6,
+        "temperature" => 0.5,
         "messages" => [
           %{"role" => "user", "content" => prompt}
         ]
@@ -270,8 +265,8 @@ defmodule OllamaClient do
   The answer should be RETURN instead of printed in the stdout.
   TASK:
   """
-  def call(model, task) do
-    prompt = "#{@system_prompt}#{task}"
+  def call(model, task, system_prompt \\ @system_prompt) do
+    prompt = "#{system_prompt}#{task}"
 
     payload =
       Jason.encode!(%{
@@ -294,29 +289,26 @@ defmodule EvaluateCode do
       File.write!("test#{Constants.file_ext()}", code |> IO.inspect(label: "code"))
       File.write!("input.txt", file_content) |> IO.inspect()
 
-      System.cmd(
-        Constants.compiler(),
-        ["test#{Constants.file_ext()}", "-std=c++11", "-o", "test"],
-        stderr_to_stdout: true
-      )
-      |> IO.inspect(label: "compiler")
-
-      File.cwd!() |> IO.inspect()
+      # System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
+      # |> IO.inspect(label: "compiler")
+      # File.cwd!() |> IO.inspect()
 
       {:ok, {result, exit_status}} =
         RunWithTimeout.call(
           fn ->
-            System.cmd(Constants.runtime(), [], stderr_to_stdout: true)
+            System.cmd(Constants.runtime(), ["test#{Constants.file_ext()}"],
+              stderr_to_stdout: true
+            )
             |> IO.inspect(label: "run")
           end,
-          30_000
+          10_000
         )
         |> IO.inspect(label: "here")
 
       if exit_status == 0 do
         {:ok, inspect(result)}
       else
-        {:error, "Error status #{exit_status}"}
+        {:error, inspect(result)}
       end
     rescue
       exception ->
@@ -327,7 +319,7 @@ end
 ```
 
 ```elixir
-System.cmd("/Users/isavita/test", [], stderr_to_stdout: true)
+# System.cmd("/Users/isavita/test", [], stderr_to_stdout: true)
 ```
 
 ## Add mutiple time FunctionRunner
@@ -373,25 +365,135 @@ task_solver_fn = fn day ->
   Given this golang program write a #{Constants.file_ext()} version that it reads its input from a file "input.txt" and solve the following task.
   The program should print the answer on the stdout and can be run `#{Constants.runtime()} solution#{Constants.file_ext()}`.
 
-  Ensure all functions or variables are declared before use. If a function is used before its definition, declare it at the beginning of your code or in a header file.
-  Always insert a space between consecutive right angle brackets in template declarations to ensure compatibility with older C++ standards. For example, use std::vector<std::vector<int> > instead of std::vector<std::vector<int>>.
-  Use appropriate constructors for non-aggregate types like std::vector or std::unordered_map instead of brace initialization when not directly supported.
-  Include the correct header for the function you are trying to use. For std::accumulate, include <numeric> at the beginning of your file.
-
   Golang Task:
   """
 
-  # "gpt-4-turbo-preview" OllamaClient.call("deepseek-coder:6.7b", task) 
-  with module_string <- OpenAIClient.call("gpt-3.5-turbo-0125", solution, system_prompt),
-       module_sanitized <- CodeResponseSanitizer.call(module_string),
-       {:ok, result} <- EvaluateCode.call(module_sanitized, input),
-       true <- String.contains?(result, answer) |> IO.inspect(label: 4) do
+  generate_solution = fn input, sys_prompt ->
+    OpenAIClient.call("gpt-3.5-turbo-0125", input, sys_prompt)
+    |> IO.inspect(label: "before sanitizing")
+    |> CodeResponseSanitizer.call()
+  end
+
+  # "gpt-4-turbo-preview"  
+  # OllamaClient.call("qwen:14b-chat", solution, system_prompt),
+  code = generate_solution.(solution, system_prompt)
+
+  with {:ok, result} <- EvaluateCode.call(code, input),
+       true <-
+         String.contains?(result, answer) ||
+           String.contains?(result, ".##..####.###..#..#.###..####.###....##.###...###.") do
     path =
       ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}#{Constants.file_ext()}|
 
-    File.write!(path, module_sanitized) |> IO.inspect(label: 5)
+    File.write!(path, code) |> IO.inspect(label: 5)
   else
-    error -> error
+    {:error, err} ->
+      prompt = """
+      #{code}
+      Produce following error:
+      #{err}
+      Give me full fixed solution
+      """
+
+      code = generate_solution.(prompt, system_prompt) |> IO.inspect(label: "NEXT TRY")
+
+      with {:ok, result} <- EvaluateCode.call(code, input),
+           true <-
+             String.contains?(result, answer) ||
+               String.contains?(result, ".##..####.###..#..#.###..####.###....##.###...###.") do
+        path =
+          ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}#{Constants.file_ext()}|
+
+        File.write!(path, code) |> IO.inspect(label: 5)
+      else
+        error -> error
+      end
+
+    error ->
+      error
+  end
+end
+````
+
+````elixir
+defmodule TaskSolver do
+  def call(day, model \\ "gpt-3.5-turbo-0125") do
+    # task = Map.fetch!(day, "task")
+    input = Map.fetch!(day, "input")
+    answer = Map.fetch!(day, "answer")
+    solution = Map.fetch!(day, "solution")
+
+    # system_prompt = """
+    # You are an expert programmer that writes simple, concise code and no comments or explanation.
+    # Write a #{Constants.file_ext()} script that it reads its input from a file "input.txt" and solve the following task.
+    # The program should print the answer as result of running the `#{Constants.compiler()} script#{Constants.file_ext()}`.
+    # """
+
+    system_prompt = """
+    You are an expert programmer that writes simple, concise code and no comments or explanation.
+    Given this golang program write a #{Constants.file_ext()} version that it reads its input from a file "input.txt" and solve the following task.
+    The program should print the answer on the stdout and can be run `#{Constants.runtime()} solution#{Constants.file_ext()}`.
+
+    Golang Task:
+    """
+
+    path =
+      ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}#{Constants.file_ext()}|
+
+    code = generate_solution(model, solution, system_prompt)
+
+    with {:ok, result} <- EvaluateCode.call(code, input),
+         true <- valid_solution?(result, answer) do
+      File.write!(path, code)
+      {:ok, path}
+    else
+      {:error, err} ->
+        handle_error(model, code, err, input, answer, path)
+
+      error ->
+        error
+    end
+  end
+
+  defp generate_solution(model, propmt, system_prompt) do
+    # OpenAIClient.call(model, propmt, system_prompt)
+    MistralClient.call(model, propmt, system_prompt)
+    |> CodeResponseSanitizer.call()
+  end
+
+  defp handle_error(model, code, err, input, answer, path) do
+    prompt =
+      """
+      Your previous solution produced following error:
+      ```#{Constants.lang()}
+      #{code}
+      ```
+      Produce following error:
+      #{err}
+
+      Give me full fixed solution without missing any code.
+      """
+      |> IO.inspect(label: "NEW PROMT")
+
+    system_prompt = """
+    You are an expert in #{Constants.lang()}, skilled at analyzing provided code alongside its error messages.
+    Examine the issues and return a fully working code solution that addresses and resolves all identified problems.
+    """
+
+    code = generate_solution(model, prompt, system_prompt) |> IO.inspect(label: "NEXT TRY")
+
+    with {:ok, result} <- EvaluateCode.call(code, input),
+         true <- valid_solution?(result, answer) do
+      File.write!(path, code)
+      {:ok, path}
+    else
+      error -> {:error, error}
+    end
+  end
+
+  defp valid_solution?(result, answer) do
+    String.contains?(result, answer) ||
+      String.contains?(result, ".##..####.###..#..#.###..####.###....##.###...###.")
   end
 end
 ````
@@ -400,10 +502,11 @@ end
 len = length(dataset_202X)
 
 Enum.reduce(dataset_202X, 1, fn day, count ->
-  FunctionRunner.run_max_times(fn -> task_solver_fn.(day) end, 1)
+  IO.puts(day["name"])
+  FunctionRunner.run_max_times(fn -> TaskSolver.call(day, "mistral-small") end, 1)
   :io.format("~.1f%\n", [count / len * 100])
   count + 1
 end)
 ```
 
-<!-- livebook:{"offset":14175,"stamp":{"token":"XCP.rxJvacNaKNhUZg1bPfuqVQHQI1NcR-m0a40JOw9FvBxbQCDEmQqjjEv7G2h94m9Xq0jqfBRoZOxNGb6ydzOcqLJW7JCvcZI-ZMOOk3eBmTKV3rMiuE591PAGxWdKYHMik02v-IDtCeWhyRrVAw","version":2}} -->
+<!-- livebook:{"offset":17341,"stamp":{"token":"XCP.rs7vCxC3EvMhOtverKZhxdP6Vsq5lrhFEjV2xwOY8MFQRxggzBbA_xZlQ-X6N_8GHOkK3fqS-2rXqde3vFyWYT04yz973bQ4SxzOxUeKTWxXt39QmEUjxcVf4wv7G3ZdFQjFLRfhj7W6JjGKAA","version":2}} -->

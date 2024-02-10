@@ -74,4 +74,68 @@ end
   |> LLMChain.run(callback_fn: callback)
 ```
 
-<!-- livebook:{"offset":1790,"stamp":{"token":"XCP.Yw9RzkbKmXRbkqQhzXKB6NXZ2YUrzgUTGJjuPcNIWnlMf1coM7haA2aMPdsoeDv1uiecHuZBzK6GOuaWQH2ZJoDGAomDsEXcsM9-49_hX8aLKFIfkyxS37UIK6JxeJXzkYGiXoO4kPHXkmc","version":2}} -->
+```elixir
+defmodule OllamaClient do
+  # 5 mins
+  @timeout 300_000
+  @url "http://localhost:11434/api/generate"
+  def call(model, task, system_prompt) do
+    prompt = "#{system_prompt}#{task}"
+
+    payload =
+      Jason.encode!(%{
+        "model" => model,
+        "prompt" => prompt,
+        "stream" => false
+      })
+
+    Req.post!(@url, body: payload, receive_timeout: @timeout).body["response"]
+  end
+end
+```
+
+```elixir
+task = """
+package main
+
+import (
+	"fmt"
+	"os"
+	"strings"
+)
+
+func main() {
+	file, err := os.ReadFile("day1/input.txt")
+	if err != nil {
+		panic(err)
+	}
+	input := strings.TrimSpace(string(file))
+	floor := 0
+	for _, c := range input {
+		if c == '(' {
+			floor++
+		} else if c == ')' {
+			floor--
+		}
+	}
+	fmt.Println(floor)
+}
+"""
+
+system_prompt = """
+You are an expert programmer that writes simple, concise code and no comments or explanation.
+Given this golang program write a .cpp version that it reads its input from a file "input.txt" and solve the following task.
+The program should print the answer on the stdout and can be run `/usr/bin/c++ solution.cpp`.
+
+Ensure all functions or variables are declared before use. If a function is used before its definition, declare it at the beginning of your code or in a header file.
+Always insert a space between consecutive right angle brackets in template declarations to ensure compatibility with older C++ standards. For example, use std::vector<std::vector<int> > instead of std::vector<std::vector<int>>.
+Use appropriate constructors for non-aggregate types like std::vector or std::unordered_map instead of brace initialization when not directly supported.
+Include the correct header for the function you are trying to use. For std::accumulate, include <numeric> at the beginning of your file.
+
+Golang Task:
+"""
+
+OllamaClient.call("qwen:14b-chat", task, system_prompt)
+```
+
+<!-- livebook:{"offset":3640,"stamp":{"token":"XCP.kFAk3sZQCv7RmrL4DH00ltBeGBoOIeoX8izGy5uvnxI3IKexFEWe9cgVhRhv3GnPinxfLzOWNNsRM1aCTPJ7AhfEomMXe4AcQBhDlLKIqQKZ_zW0fCtlKds0C20Nt0SqoCvuMAFiAWWwT-I","version":2}} -->
