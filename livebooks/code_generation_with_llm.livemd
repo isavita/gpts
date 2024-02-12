@@ -11,15 +11,16 @@ Mix.install([
 
 ```elixir
 dataset_url = "https://huggingface.co/datasets/isavita/advent-of-code/resolve/main/train.json"
-dataset = Req.get!(dataset_url).body
+dataset = Req.get!(dataset_url, receive_timeout: 600_000).body
+# dataset = File.read!("/Users/isavita/git/advent-of-code/train.json") |> Jason.decode!()
 ```
 
 ```elixir
 defmodule Constants do
-  def file_ext, do: ".ts"
-  def lang, do: "typescript"
-  def compiler, do: "/Users/isavita/.nvm/versions/node/v19.8.1/bin/tsc"
-  def runtime, do: "/Users/isavita/.nvm/versions/node/v19.8.1/bin/node"
+  def file_ext, do: ".swift"
+  def lang, do: "swift"
+  def compiler, do: "/usr/bin/swift"
+  def runtime, do: "/usr/bin/swift"
 end
 
 Constants.compiler()
@@ -27,13 +28,14 @@ Constants.compiler()
 
 ```elixir
 program = ~S|
-console.log(42);
+print("Hello, World!")
 |
 
 File.write!("test#{Constants.file_ext()}", program)
 # System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
-# System.cmd("/Users/isavita/.nvm/versions/node/v19.8.1/bin/node", ["--version"])
-System.cmd(Constants.runtime(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
+System.cmd(Constants.runtime(), ["run", "-q", "test#{Constants.file_ext()}"],
+  stderr_to_stdout: true
+)
 ```
 
 ```elixir
@@ -158,15 +160,14 @@ defmodule OpenAIClient do
   ```
   TASK:
   """
-  def call(model, task, system_prompt \\ @system_prompt) do
-    prompt = "#{system_prompt}#{task}"
-
+  def call(model, prompt, system_prompt \\ @system_prompt) do
     payload =
       %{
         "model" => model,
-        "temperature" => 0.5,
+        "temperature" => 0.3,
         "messages" => [
-          %{"role" => "user", "content" => prompt}
+          # %{"role" => "system", "content" => system_prompt},
+          %{"role" => "user", "content" => "#{system_prompt}\n#{prompt}"}
         ]
       }
       |> Jason.encode!()
@@ -245,12 +246,6 @@ defmodule RunWithTimeout do
 end
 ```
 
-```elixir
-"""
-defmodule SafeCracking do def call do "input.txt" |> File.read!() |> calculate() |> Keyword.get(:a) end defp parse_line(line) do line |> String.split(" ") |> Enum.map(&parse_elem/1) end defp parse_elem(value), do: parse_elem(value, Integer.parse(value)) defp parse_elem(value, :error), do: String.to_atom(value) defp parse_elem(_value, {int, ""}), do: int defp loop(list), do: loop(list, 0, init()) defp loop(list, pointer, info) when pointer >= length(list), do: info defp loop(list, pointer, info) do item = Enum.at(list, pointer) {list, pointer, info} = execute(item, list, pointer, info) loop(list, pointer, info) end defp execute([:cpy, _value, elem], list, pointer, info) when is_integer(elem) do IO.puts("This shouldn't happen") 1 / 0 {list, pointer + 1, info} end defp execute([:cpy, value, elem], list, pointer, info) do value = parse_value(info, value) info = set(info, elem, value) {list, pointer + 1, info} end defp execute([:inc, elem], list, pointer, info) do info = set(info, elem, get(info, elem) + 1) {list, pointer + 1, info} end defp execute([:dec, elem], list, pointer, info) do info = set(info, elem, get(info, elem) - 1) {list, pointer + 1, info} end defp execute([:jnz, value, change], list, pointer, info) do value = parse_value(info, value) change = parse_value(info, change) pointer = if (value == 0), do: pointer + 1, else: pointer + change {list, pointer, info} end defp execute([:tgl, elem], list, pointer, info) do toggle_index = get(info, elem) + pointer item = Enum.at(list, toggle_index) list = toggle_elem(list, toggle_index, item) {list, pointer + 1, info} end defp toggle_elem(list, _, nil), do: list defp toggle_elem(list, index, item) do item = toggle_instruction(item) List.replace_at(list, index, item) end defp toggle_instruction([:inc, elem]), do: [:dec, elem] defp toggle_instruction([_, elem]), do: [:inc, elem] defp toggle_instruction([:jnz, a, b]), do: [:cpy, a, b] defp toggle_instruction([_, a, b]), do: [:jnz, a, b] defp get(info, elem), do: Keyword.get(info, elem) defp set(info, elem, value) do Keyword.put(info, elem, value) end defp parse_value(_info, value) when is_integer(value), do: value defp parse_value(info, value), do: get(info, value) defp init do [a: 7, b: 0, c: 0, d: 0] end defp calculate(input) do input |> String.split("\n") |> List.delete_at(-1) |> Enum.map(&parse_line/1) |> loop end end
-"""
-```
-
 ## Manage Request to local ollama model
 
 ```elixir
@@ -296,12 +291,12 @@ defmodule EvaluateCode do
       {:ok, {result, exit_status}} =
         RunWithTimeout.call(
           fn ->
-            System.cmd(Constants.runtime(), ["test#{Constants.file_ext()}"],
+            System.cmd(Constants.runtime(), ["run", "-q", "test#{Constants.file_ext()}"],
               stderr_to_stdout: true
             )
             |> IO.inspect(label: "run")
           end,
-          10_000
+          30_000
         )
         |> IO.inspect(label: "here")
 
@@ -318,21 +313,9 @@ defmodule EvaluateCode do
 end
 ```
 
-```elixir
-# System.cmd("/Users/isavita/test", [], stderr_to_stdout: true)
-```
-
 ## Add mutiple time FunctionRunner
 
 ````elixir
-defmodule CodeResponseSanitizer do
-  def call(input) when is_binary(input) do
-    input
-    |> String.replace(~r/^(\n|.)*```#{Constants.lang()}/, "")
-    |> String.replace(~r/```(\n|.)*$/, "")
-  end
-end
-
 defmodule FunctionRunner do
   def run_max_times(function, max_attempts) do
     do_run_max_times(function, max_attempts, 1)
@@ -348,99 +331,39 @@ defmodule FunctionRunner do
   defp do_run_max_times(_function, _max_attempts, _attempt), do: :error
 end
 
-task_solver_fn = fn day ->
-  # task = Map.fetch!(day, "task")
-  input = Map.fetch!(day, "input")
-  answer = Map.fetch!(day, "answer")
-  solution = Map.fetch!(day, "solution")
-
-  # system_prompt = """
-  # You are an expert programmer that writes simple, concise code and no comments or explanation.
-  # Write a #{Constants.file_ext()} script that it reads its input from a file "input.txt" and solve the following task.
-  # The program should print the answer as result of running the `#{Constants.compiler()} script#{Constants.file_ext()}`.
-  # """
-
-  system_prompt = """
-  You are an expert programmer that writes simple, concise code and no comments or explanation.
-  Given this golang program write a #{Constants.file_ext()} version that it reads its input from a file "input.txt" and solve the following task.
-  The program should print the answer on the stdout and can be run `#{Constants.runtime()} solution#{Constants.file_ext()}`.
-
-  Golang Task:
-  """
-
-  generate_solution = fn input, sys_prompt ->
-    OpenAIClient.call("gpt-3.5-turbo-0125", input, sys_prompt)
-    |> IO.inspect(label: "before sanitizing")
-    |> CodeResponseSanitizer.call()
-  end
-
-  # "gpt-4-turbo-preview"  
-  # OllamaClient.call("qwen:14b-chat", solution, system_prompt),
-  code = generate_solution.(solution, system_prompt)
-
-  with {:ok, result} <- EvaluateCode.call(code, input),
-       true <-
-         String.contains?(result, answer) ||
-           String.contains?(result, ".##..####.###..#..#.###..####.###....##.###...###.") do
-    path =
-      ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}#{Constants.file_ext()}|
-
-    File.write!(path, code) |> IO.inspect(label: 5)
-  else
-    {:error, err} ->
-      prompt = """
-      #{code}
-      Produce following error:
-      #{err}
-      Give me full fixed solution
-      """
-
-      code = generate_solution.(prompt, system_prompt) |> IO.inspect(label: "NEXT TRY")
-
-      with {:ok, result} <- EvaluateCode.call(code, input),
-           true <-
-             String.contains?(result, answer) ||
-               String.contains?(result, ".##..####.###..#..#.###..####.###....##.###...###.") do
-        path =
-          ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}#{Constants.file_ext()}|
-
-        File.write!(path, code) |> IO.inspect(label: 5)
-      else
-        error -> error
-      end
-
-    error ->
-      error
+defmodule CodeResponseSanitizer do
+  def call(input) when is_binary(input) do
+    input
+    |> String.replace(~r/^(\n|.)*```#{Constants.lang()}/, "")
+    |> String.replace(~r/```(\n|.)*$/, "")
   end
 end
-````
 
-````elixir
 defmodule TaskSolver do
   def call(day, model \\ "gpt-3.5-turbo-0125") do
-    # task = Map.fetch!(day, "task")
+    task = Map.fetch!(day, "task")
     input = Map.fetch!(day, "input")
     answer = Map.fetch!(day, "answer")
-    solution = Map.fetch!(day, "solution")
-
-    # system_prompt = """
-    # You are an expert programmer that writes simple, concise code and no comments or explanation.
-    # Write a #{Constants.file_ext()} script that it reads its input from a file "input.txt" and solve the following task.
-    # The program should print the answer as result of running the `#{Constants.compiler()} script#{Constants.file_ext()}`.
-    # """
+    # solution = Map.fetch!(day, "solution")
 
     system_prompt = """
     You are an expert programmer that writes simple, concise code and no comments or explanation.
-    Given this golang program write a #{Constants.file_ext()} version that it reads its input from a file "input.txt" and solve the following task.
-    The program should print the answer on the stdout and can be run `#{Constants.runtime()} solution#{Constants.file_ext()}`.
-
-    Golang Task:
+    Write a #{Constants.file_ext()} script that it reads its input from a file "input.txt" and solve the following task.
+    The program should print the answer as result of running the `#{Constants.compiler()} script#{Constants.file_ext()}`.
     """
+
+    # system_prompt = """
+    # You are an expert programmer that writes simple, concise code and no comments or explanation.
+    # Given this golang program write a #{Constants.file_ext()} version that it reads its input from a file "input.txt" and solve the following task.
+    # The program should print the answer on the stdout and can be run `#{Constants.runtime()} solution#{Constants.file_ext()}`.
+
+    # Golang Task:
+    # """
 
     path =
       ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}#{Constants.file_ext()}|
 
-    code = generate_solution(model, solution, system_prompt)
+    code = generate_solution(model, task, system_prompt)
 
     with {:ok, result} <- EvaluateCode.call(code, input),
          true <- valid_solution?(result, answer) do
@@ -456,8 +379,9 @@ defmodule TaskSolver do
   end
 
   defp generate_solution(model, propmt, system_prompt) do
-    # OpenAIClient.call(model, propmt, system_prompt)
-    MistralClient.call(model, propmt, system_prompt)
+    OpenAIClient.call(model, propmt, system_prompt)
+    # MistralClient.call(model, propmt, system_prompt)
+    # OllamaClient.call(model, propmt, system_prompt)
     |> CodeResponseSanitizer.call()
   end
 
@@ -482,9 +406,9 @@ defmodule TaskSolver do
 
     code = generate_solution(model, prompt, system_prompt) |> IO.inspect(label: "NEXT TRY")
 
-    with {:ok, result} <- EvaluateCode.call(code, input),
-         true <- valid_solution?(result, answer) do
-      File.write!(path, code)
+    with {:ok, result} <- EvaluateCode.call(code, input) |> IO.inspect(label: "NEXT call"),
+         true <- valid_solution?(result, answer) |> IO.inspect(label: "NEXT valid check") do
+      File.write!(path, code) |> IO.inspect(label: "it uses this")
       {:ok, path}
     else
       error -> {:error, error}
@@ -492,8 +416,40 @@ defmodule TaskSolver do
   end
 
   defp valid_solution?(result, answer) do
+    # day8_part2_2016
+    # day10_part1_2018
+    # day1_part1_2019
+    # day8_part2_2019
+    # day11_part2_2019"
+    # day13_part2_2021
+    # day10_part2_2022
     String.contains?(result, answer) ||
-      String.contains?(result, ".##..####.###..#..#.###..####.###....##.###...###.")
+      String.contains?(result, [
+        ".##..####.###..#..#.###..####.###....##.###...###.",
+        " ##  #### ###  #  # ###  #### ###    ## ###   ### "
+      ]) ||
+      String.contains?(result, [
+        "#....#..#....#.....###..######....##....#....#....##....######",
+        "#    #  #    #     ###  ######    ##    #    #    ##    ######"
+      ]) ||
+      String.contains?(result, "3.465154e+06") ||
+      String.contains?(result, [
+        "####.###..####.#..#.###..\n#....#..#....#.#..#.#..#.",
+        "#### ###  #### #  # ###  \n#    #  #    # #  # #  # "
+      ]) ||
+      String.contains?(result, [
+        ".#....###....##.#..#.####.#..#.#....#..#.\n",
+        " #    ###    ## #  # #### #  # #    #  # \n",
+        " █    ███    ██ █  █ ████ █  █ █    █  █ \n"
+      ]) ||
+      String.contains?(result, [
+        "#..#.#..#.#..#.#..#.#..#.#..#.#..#....#",
+        "#  # #  # #  # #  # #  # #  # #  #    #"
+      ]) ||
+      String.contains?(result, [
+        "###..###..###...##..###...##...##..####.",
+        "###  ###  ###   ##  ###   ##   ##  #### "
+      ])
   end
 end
 ````
@@ -503,10 +459,10 @@ len = length(dataset_202X)
 
 Enum.reduce(dataset_202X, 1, fn day, count ->
   IO.puts(day["name"])
-  FunctionRunner.run_max_times(fn -> TaskSolver.call(day, "mistral-small") end, 1)
+  FunctionRunner.run_max_times(fn -> TaskSolver.call(day) end, 1)
   :io.format("~.1f%\n", [count / len * 100])
   count + 1
 end)
 ```
 
-<!-- livebook:{"offset":17341,"stamp":{"token":"XCP.rs7vCxC3EvMhOtverKZhxdP6Vsq5lrhFEjV2xwOY8MFQRxggzBbA_xZlQ-X6N_8GHOkK3fqS-2rXqde3vFyWYT04yz973bQ4SxzOxUeKTWxXt39QmEUjxcVf4wv7G3ZdFQjFLRfhj7W6JjGKAA","version":2}} -->
+<!-- livebook:{"offset":13853,"stamp":{"token":"XCP.9TjUEeX_BnAgE-gBpxAEzA1dAVTAaI7SxxaV1KsV9UqN4rYLIFgwO0y0Z6WrW7UFULu-ZBzeFMz4BgK18yJCDbClvr59sXvvptroxLaCc1gmnMEqYcCYrUPJRPHmiRrrFBvM7e7sFHfGims0WQ","version":2}} -->
