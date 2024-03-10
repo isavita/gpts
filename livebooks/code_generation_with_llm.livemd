@@ -10,36 +10,40 @@ Mix.install([
 ## Load all advent of code from hugging face
 
 ```elixir
-dataset_url = "https://huggingface.co/datasets/isavita/advent-of-code/resolve/main/train.json"
-dataset = Req.get!(dataset_url, receive_timeout: 600_000).body
-# dataset = File.read!("/Users/isavita/git/advent-of-code/train.json") |> Jason.decode!()
+# dataset_url = "https://huggingface.co/datasets/isavita/advent-of-code/resolve/main/train.json"
+# dataset = Req.get!(dataset_url, receive_timeout: 600_000).body
+dataset = File.read!("/Users/isavita/git/advent-of-code/train.json") |> Jason.decode!()
 ```
 
 ```elixir
 defmodule Constants do
-  def file_ext, do: ".swift"
-  def lang, do: "swift"
-  def compiler, do: "/usr/bin/swift"
-  def runtime, do: "/usr/bin/swift"
+  def file_ext, do: ".exs"
+  def lang, do: "elixir"
+  def compiler, do: "/Users/isavita/.asdf/shims/elixir"
+  def runtime, do: "/Users/isavita/.asdf/shims/elixir"
 end
 
-Constants.compiler()
+Constants.runtime()
 ```
 
 ```elixir
 program = ~S|
-print("Hello, World!")
+IO.puts("Hello, Elixir!")
 |
 
 File.write!("test#{Constants.file_ext()}", program)
-# System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
-System.cmd(Constants.runtime(), ["run", "-q", "test#{Constants.file_ext()}"],
-  stderr_to_stdout: true
-)
+# System.cmd(Constants.compiler(), ["task#{Constants.file_ext()}"], stderr_to_stdout: true)
+# System.cmd("chmod", ["+x", "test#{Constants.file_ext()}"])
+# System.cmd("#{File.cwd!()}/test", [], stderr_to_stdout: true)
+# "#{File.cwd!()}/test#{Constants.file_ext()}"
+# 
+# System.cmd("/Users/isavita/test.sh", [])
+# args = ["run", "--rm", "--platform", "linux/amd64", "-i", "-v", "#{File.cwd!()}/test.d:/test.d", "dlang2/dmd-ubuntu", "/bin/bash", "-c", "dmd test.d && ./test"]
+System.cmd(Constants.runtime(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
 ```
 
 ```elixir
-solutions = File.ls!("#{File.cwd!()}/code/advent_generated")
+solutions = File.ls!("#{File.cwd!()}/code/advent_generated/")
 solved_parts = Enum.map(solutions, &String.replace(&1, Constants.file_ext(), ""))
 
 dataset_202X =
@@ -52,8 +56,8 @@ dataset_202X =
 
 ```elixir
 defmodule MistralClient do
-  # 5 mins
-  @timeout 300_000
+  # 10 mins
+  @timeout 600_000
   @url "https://api.mistral.ai/v1/chat/completions"
   @system_prompt """
   You are an expert programmer that writes simple, concise code and no comments or explanation.
@@ -71,7 +75,7 @@ defmodule MistralClient do
         "messages" => [
           %{"role" => "user", "content" => prompt}
         ],
-        "temperature" => 0.3,
+        "temperature" => 0.7,
         "stream" => false
       }
       |> Jason.encode!()
@@ -96,8 +100,8 @@ end
 
 ````elixir
 defmodule OpenAIClient do
-  # 10 mins
-  @timeout 600_000
+  # 12 mins
+  @timeout 1_200_000
   @url "https://api.openai.com/v1/chat/completions"
   @system_prompt """
   You are an expert programmer that writes simple, concise code and no comments or explanation.
@@ -164,7 +168,7 @@ defmodule OpenAIClient do
     payload =
       %{
         "model" => model,
-        "temperature" => 0.3,
+        "temperature" => 0.7,
         "messages" => [
           # %{"role" => "system", "content" => system_prompt},
           %{"role" => "user", "content" => "#{system_prompt}\n#{prompt}"}
@@ -250,14 +254,26 @@ end
 
 ```elixir
 defmodule OllamaClient do
-  # 5 mins
-  @timeout 300_000
-  @url "http://localhost:11434/api/generate"
+  # 20 mins
+  @timeout 1_200_000
+  # "http://localhost:11434/api/generate"
+  @url "http://localhost:11434/v1/chat/completions"
+  @sys_prompt """
+  As a highly experienced software developer with a degree in computer science and a background in competitive programming, strive to:
+
+  1. Write efficient and concise solutions.
+  2. Prioritize clarity and readability in your code.
+  3. Include only necessary comments, focusing on explaining any tricky or complex parts of the code.
+  4. Ensure your code is well-organized and easy to follow.
+  5. Use appropriate data structures and algorithms for the problem at hand.
+  6. Follow best practices and coding standards for the language you are using.
+
+  By following these guidelines, you can write high-quality code that is both efficient and maintainable.
+  """
   @system_prompt """
-  You are an expert programmer that writes simple, concise code and no comments or explanation.
-  Write a elixir module that it reads its input from a file "input.txt" and solve the following task.
-  The module should have only one public function called `call` with arity 0.
-  The answer should be RETURN instead of printed in the stdout.
+  You are #{Constants.lang()} programmer that writes simple, concise code and no comments or explanation.
+  Write #{Constants.lang()} program that it reads its input from a file "input.txt" and solve the following task.
+  The answer MUST BE printed to the stdout.
   TASK:
   """
   def call(model, task, system_prompt \\ @system_prompt) do
@@ -266,13 +282,35 @@ defmodule OllamaClient do
     payload =
       Jason.encode!(%{
         "model" => model,
-        "prompt" => prompt,
+        "messages" => [
+          %{
+            "role" => "system",
+            "content" => @sys_prompt
+          },
+          %{
+            "role" => "user",
+            "content" => prompt
+          }
+        ],
         "stream" => false
       })
 
-    Req.post!(@url, body: payload, receive_timeout: @timeout).body["response"]
+    case Req.post(@url, body: payload, receive_timeout: @timeout) do
+      {:ok, resp} ->
+        body = resp.body
+        choice = hd(body["choices"] || [%{}])
+        choice["message"]["content"]
+
+      error ->
+        IO.puts("#{__MODULE__}: #{inspect(error)}")
+        ""
+    end
   end
 end
+```
+
+```elixir
+# resp = OllamaClient.call("neural-chat", "Write me a Nim program that reads a number from a file input.txt and multiply it by itself and prints the answer to the stdout.", "")
 ```
 
 ## Code evaluator
@@ -282,21 +320,24 @@ defmodule EvaluateCode do
   def call(code, file_content) do
     try do
       File.write!("test#{Constants.file_ext()}", code |> IO.inspect(label: "code"))
-      File.write!("input.txt", file_content) |> IO.inspect()
+      File.write!("input.txt", file_content)
 
       # System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
-      # |> IO.inspect(label: "compiler")
-      # File.cwd!() |> IO.inspect()
+
+      # System.cmd(Constants.compiler(), ["-framework", "Foundation", "test#{Constants.file_ext()}", "-o", "test"]) |> IO.inspect(label: 1)
+      # System.cmd("chmod", ["+x", "test#{Constants.file_ext()}"]) |> IO.inspect(label: 2)
 
       {:ok, {result, exit_status}} =
         RunWithTimeout.call(
           fn ->
-            System.cmd(Constants.runtime(), ["run", "-q", "test#{Constants.file_ext()}"],
-              stderr_to_stdout: true
-            )
+            # System.cmd("#{File.cwd!()}/test", [], stderr_to_stdout: true)
+            # args = ["run", "--rm", "--platform", "linux/amd64", "-i", "-v", "#{File.cwd!()}/test.d:/test.d", "-v", "#{File.cwd!()}/input.txt:/input.txt", "dlang2/dmd-ubuntu", "/bin/bash", "-c", "dmd test.d && ./test"]
+            args = ["test#{Constants.file_ext()}"]
+
+            System.cmd(Constants.runtime(), args, stderr_to_stdout: true)
             |> IO.inspect(label: "run")
           end,
-          30_000
+          20_000
         )
         |> IO.inspect(label: "here")
 
@@ -333,37 +374,57 @@ end
 
 defmodule CodeResponseSanitizer do
   def call(input) when is_binary(input) do
-    input
-    |> String.replace(~r/^(\n|.)*```#{Constants.lang()}/, "")
-    |> String.replace(~r/```(\n|.)*$/, "")
+    case Regex.scan(~r/```(?:#{Constants.lang()})?(.*?)```/sim, input) do
+      [[_full_match, code] | _tail] -> code
+      _ -> input |> IO.inspect(label: "NO MATCH")
+    end
   end
 end
 
 defmodule TaskSolver do
   def call(day, model \\ "gpt-3.5-turbo-0125") do
-    task = Map.fetch!(day, "task")
+    # task = Map.fetch!(day, "task")
     input = Map.fetch!(day, "input")
     answer = Map.fetch!(day, "answer")
-    # solution = Map.fetch!(day, "solution")
-
-    system_prompt = """
-    You are an expert programmer that writes simple, concise code and no comments or explanation.
-    Write a #{Constants.file_ext()} script that it reads its input from a file "input.txt" and solve the following task.
-    The program should print the answer as result of running the `#{Constants.compiler()} script#{Constants.file_ext()}`.
-    """
+    solution = Map.fetch!(day, "solution")
 
     # system_prompt = """
     # You are an expert programmer that writes simple, concise code and no comments or explanation.
-    # Given this golang program write a #{Constants.file_ext()} version that it reads its input from a file "input.txt" and solve the following task.
-    # The program should print the answer on the stdout and can be run `#{Constants.runtime()} solution#{Constants.file_ext()}`.
+    # Write a #{Constants.lang()} program that it reads its input from a file "input.txt" and solve the following task.
+    # It should print the answer when execute it.
+    #   The program structure should follow this template:
+    # ```#{Constants.lang()}
+    # defmodule Challenge do
+    #   def call do
+    #     # Read input and solve challenge
+    #     result = ...
 
-    # Golang Task:
+    #     # Print result
+    #     IO.puts(result)
+    #   end
+    # end
+    # Challenge.call()
+    # ```
+
+    # Aim to write clean, efficient #{Constants.lang()} code that demonstrates strong programming skills.
+
+    # Coding challenge:
     # """
+
+    system_prompt = """
+    You are an expert programmer that writes simple, concise code and no comments or explanation.
+    Given this golang program write a #{Constants.lang()} version that it reads its input from a file "input.txt" and solve the following task.
+    The program should print the answer on the stdout and can be run `#{Constants.runtime()} solution#{Constants.file_ext()}`.
+    The program MUST READ its input from a file "input.txt".
+    It should print the answer and exit successfully.
+
+    Golang Task:
+    """
 
     path =
       ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}#{Constants.file_ext()}|
 
-    code = generate_solution(model, task, system_prompt)
+    code = generate_solution(model, solution, system_prompt)
 
     with {:ok, result} <- EvaluateCode.call(code, input),
          true <- valid_solution?(result, answer) do
@@ -379,10 +440,16 @@ defmodule TaskSolver do
   end
 
   defp generate_solution(model, propmt, system_prompt) do
-    OpenAIClient.call(model, propmt, system_prompt)
+    # ft:gpt-3.5-turbo-0125:personal:erlang-0303:8yge7H3W
+    # "ft:gpt-3.5-turbo-0125:personal:elixir:90xUsEr3"
+
     # MistralClient.call(model, propmt, system_prompt)
-    # OllamaClient.call(model, propmt, system_prompt)
+    # OpenAIClient.call(model, propmt, system_prompt) 
+    (OllamaClient.call(model, propmt, system_prompt) ||
+       "")
+    |> IO.inspect(label: "before parse")
     |> CodeResponseSanitizer.call()
+    |> String.trim()
   end
 
   defp handle_error(model, code, err, input, answer, path) do
@@ -420,7 +487,7 @@ defmodule TaskSolver do
     # day10_part1_2018
     # day1_part1_2019
     # day8_part2_2019
-    # day11_part2_2019"
+    # day11_part2_2019
     # day13_part2_2021
     # day10_part2_2022
     String.contains?(result, answer) ||
@@ -432,7 +499,7 @@ defmodule TaskSolver do
         "#....#..#....#.....###..######....##....#....#....##....######",
         "#    #  #    #     ###  ######    ##    #    #    ##    ######"
       ]) ||
-      String.contains?(result, "3.465154e+06") ||
+      String.contains?(result, ["3.465154e+06", "3.465154e+6"]) ||
       String.contains?(result, [
         "####.###..####.#..#.###..\n#....#..#....#.#..#.#..#.",
         "#### ###  #### #  # ###  \n#    #  #    # #  # #  # "
@@ -459,10 +526,15 @@ len = length(dataset_202X)
 
 Enum.reduce(dataset_202X, 1, fn day, count ->
   IO.puts(day["name"])
-  FunctionRunner.run_max_times(fn -> TaskSolver.call(day) end, 1)
+
+  FunctionRunner.run_max_times(
+    fn -> TaskSolver.call(day, "neural-chat") end,
+    1
+  )
+
   :io.format("~.1f%\n", [count / len * 100])
   count + 1
 end)
 ```
 
-<!-- livebook:{"offset":13853,"stamp":{"token":"XCP.9TjUEeX_BnAgE-gBpxAEzA1dAVTAaI7SxxaV1KsV9UqN4rYLIFgwO0y0Z6WrW7UFULu-ZBzeFMz4BgK18yJCDbClvr59sXvvptroxLaCc1gmnMEqYcCYrUPJRPHmiRrrFBvM7e7sFHfGims0WQ","version":2}} -->
+<!-- livebook:{"offset":16706,"stamp":{"token":"XCP.defGO7ObyBvw1VNi8tUNdq1p6chR-YypYCuZfdat9wDEwFbpJffF5YpbzYNmABPYXeKtQLaeuhVvqoF9JnYppLpU1qZt3OwSd4bD0uScSB2cp2orSEKgKttZC5axJiJbL5q3HPJc2d59ZbsbxQ","version":2}} -->

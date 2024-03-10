@@ -1,0 +1,58 @@
+# Ollama Embeddings Notebook
+
+```elixir
+Mix.install([
+  :req,
+  :jason
+])
+```
+
+## Fetch Advent Of Code Dataset
+
+```elixir
+dataset_url = "https://huggingface.co/datasets/isavita/advent-of-code/resolve/main/train.json"
+dataset = Req.get!(dataset_url, receive_timeout: 600_000).body
+```
+
+## Nomic embeddings
+
+```elixir
+get_embedding = fn text ->
+  url = "http://localhost:11434/api/embeddings"
+
+  payload =
+    %{
+      "model" => "nomic-embed-text",
+      "prompt" => text
+    }
+    |> Jason.encode!()
+
+  resp = Req.post!(url, body: payload, receive_timeout: 600_000)
+
+  if resp.status == 200 do
+    {:ok, resp.body["embedding"]}
+  else
+    {:error, "Status: #{resp.status} Body: #{inspect(resp.body)}"}
+  end
+end
+
+# {:ok, embed} = get_embedding.("The sky is blue because of Rayleigh scattering")
+```
+
+```elixir
+# Task -> meta: {day["solution_lang"], day["solution"]}
+embed_task_lang_solution =
+  Enum.map(dataset, fn day ->
+    {:ok, embed} = get_embedding.(day["task"])
+    {embed, day["task"], day["solution_lang"], day["solution"]}
+  end)
+```
+
+```elixir
+cosine_similarity = fn a, b ->
+  dot_prod = a |> Enum.zip(b) |> Enum.map(fn {a1, b1} -> a1 * b1 end) |> Enum.sum()
+  mag_a = a |> Enum.reduce(fn x, acc -> acc + x * x end) |> Math.sqrt()
+  mag_b = b |> Enum.reduce(fn x, acc -> acc + x * x end) |> Math.sqrt()
+  dot_prod / (mag_a * mag_b)
+end
+```
