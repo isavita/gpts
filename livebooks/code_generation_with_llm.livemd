@@ -17,10 +17,10 @@ dataset = File.read!("/Users/isavita/git/advent-of-code/train.json") |> Jason.de
 
 ```elixir
 defmodule Constants do
-  def file_ext, do: ".exs"
-  def lang, do: "elixir"
-  def compiler, do: "/Users/isavita/.asdf/shims/elixir"
-  def runtime, do: "/Users/isavita/.asdf/shims/elixir"
+  def file_ext, do: ".zig"
+  def lang, do: "zig"
+  def compiler, do: "/opt/homebrew/bin/zig"
+  def runtime, do: "/opt/homebrew/bin/zig"
 end
 
 Constants.runtime()
@@ -28,7 +28,11 @@ Constants.runtime()
 
 ```elixir
 program = ~S|
-IO.puts("Hello, Elixir!")
+const std = @import("std");
+
+pub fn main() void {
+    std.debug.print("Hello, World!\n", .{});
+}
 |
 
 File.write!("test#{Constants.file_ext()}", program)
@@ -38,12 +42,12 @@ File.write!("test#{Constants.file_ext()}", program)
 # "#{File.cwd!()}/test#{Constants.file_ext()}"
 # 
 # System.cmd("/Users/isavita/test.sh", [])
-# args = ["run", "--rm", "--platform", "linux/amd64", "-i", "-v", "#{File.cwd!()}/test.d:/test.d", "dlang2/dmd-ubuntu", "/bin/bash", "-c", "dmd test.d && ./test"]
-System.cmd(Constants.runtime(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
+# System.cmd(Constants.runtime(), ["script", "test#{Constants.file_ext()}"], stderr_to_stdout: true)
+System.cmd(Constants.runtime(), ["run", "test#{Constants.file_ext()}"], stderr_to_stdout: true)
 ```
 
 ```elixir
-solutions = File.ls!("#{File.cwd!()}/code/advent_generated/")
+solutions = File.ls!("#{File.cwd!()}/code/advent_generated/zig")
 solved_parts = Enum.map(solutions, &String.replace(&1, Constants.file_ext(), ""))
 
 dataset_202X =
@@ -98,79 +102,22 @@ defmodule MistralClient do
 end
 ```
 
-````elixir
+```elixir
 defmodule OpenAIClient do
   # 12 mins
   @timeout 1_200_000
   @url "https://api.openai.com/v1/chat/completions"
-  @system_prompt """
-  You are an expert programmer that writes simple, concise code and no comments or explanation.
-  Write a elixir module that it reads its input from a file "input.txt" and solve the following task.
-  The module should have only one public function called `call` with arity 0.
-  The answer should be RETURN instead of printed in the stdout.
-  HERE ARE SOME IMPLEMENTATION that you can copy and paste and add to your code of helpful functions:
-  ```
-  defp min(a, b) do
-    if a < b, do: a, else: b
-  end
+  @system_prompt ~s|You are a highly experienced programmer with a PhD in computer science participating in a coding challenge.
+Write clean, efficient code without unnecessary comments, demonstrating your advanced skills by solving problems practically and concisely.
+Aim to produce optimal and concise solutions, leveraging your decade of industry experience.|
 
-  defp max(a, b) do
-    if a > b, do: a, else: b
-  end
-
-  defp string_replace_at(original, index, replacement) do
-    {head, tail} = String.split_at(original, index)
-    replacement_length = String.length(replacement)
-
-    head <> replacement <> String.slice(tail, replacement_length, String.length(tail) - replacement_length)
-  end
-
-    iex> String.graphemes("Ńaïve")
-    ["Ń", "a", "ï", "v", "e"]
-
-
-  # Depth First Search function
-  defp dfs(graph, start_node) do
-    dfs_recursive(graph, start_node, MapSet.new(), [])
-  end
-
-  # Recursive helper function for DFS
-  defp dfs_recursive(graph, current_node, visited, path) do
-    if MapSet.member?(visited, current_node) do
-      {visited, path}
-    else
-      new_visited = MapSet.put(visited, current_node)
-      new_path = [current_node | path]
-
-      Enum.reduce(graph[current_node] || [], {new_visited, new_path}, fn neighbor, {vis, pth} ->
-        dfs_recursive(graph, neighbor, vis, pth)
-      end)
-    end
-  end
-
-  # Breadth First Search function
-  defp bfs(graph, start_node) do
-    bfs_queue([start_node], MapSet.new([start_node]), graph, [])
-  end
-
-  defp bfs_queue([], _visited, _graph, acc), do: Enum.reverse(acc)
-
-  defp bfs_queue([current_node | rest], visited, graph, acc) do
-    neighbors = graph[current_node] || []
-    unvisited_neighbors = Enum.filter(neighbors, &(!MapSet.member?(visited, &1)))
-    new_visited = Enum.reduce(unvisited_neighbors, visited, &MapSet.put(&2, &1))
-    bfs_queue(rest ++ unvisited_neighbors, new_visited, graph, [current_node | acc])
-  end
-  ```
-  TASK:
-  """
   def call(model, prompt, system_prompt \\ @system_prompt) do
     payload =
       %{
         "model" => model,
-        "temperature" => 0.7,
+        "temperature" => 0.5,
         "messages" => [
-          # %{"role" => "system", "content" => system_prompt},
+          %{"role" => "system", "content" => system_prompt},
           %{"role" => "user", "content" => "#{system_prompt}\n#{prompt}"}
         ]
       }
@@ -192,7 +139,64 @@ defmodule OpenAIClient do
 
   defp openai_api_key, do: System.fetch_env!("LB_OPENAI_API_KEY")
 end
-````
+```
+
+```elixir
+defmodule AnthropicClient do
+  # 10 mins
+  @timeout 600_000
+  @url "https://api.anthropic.com/v1/messages"
+  @system_prompt """
+  As a highly experienced software developer with a degree in computer science and a background in competitive programming, strive to:
+
+  1. Write efficient and concise solutions.
+  2. Prioritize clarity and readability in your code.
+  3. Include only necessary comments, focusing on explaining any tricky or complex parts of the code.
+  4. Ensure your code is well-organized and easy to follow.
+  5. Use appropriate data structures and algorithms for the problem at hand.
+  6. Follow best practices and coding standards for the language you are using.
+
+  By following these guidelines, you can write high-quality code that is both efficient and maintainable.
+  """
+  def call(model, task, system_prompt \\ @system_prompt) do
+    prompt = "#{system_prompt}#{task}"
+
+    payload = %{
+      "model" => model,
+      "max_tokens" => 4096,
+      "messages" => [
+        %{"role" => "user", "content" => prompt}
+      ],
+      "temperature" => 0.1,
+      "stream" => false
+    }
+
+    case Req.post(@url, json: payload, headers: headers(), receive_timeout: @timeout) do
+      {:ok, resp} ->
+        if resp.status == 200 do
+          body = resp.body
+          content = hd(body["content"] || [%{}])
+          content["text"]
+        else
+          IO.puts("#{__MODULE__}: #{inspect(resp.body)}")
+          ""
+        end
+
+      error ->
+        IO.puts("#{__MODULE__}: #{inspect(error)}")
+        ""
+    end
+  end
+
+  defp headers do
+    %{
+      "content-type" => "application/json",
+      "anthropic-version" => "2023-06-01",
+      "x-api-key" => System.fetch_env!("LB_ANTHROPIC_API_KEY")
+    }
+  end
+end
+```
 
 ```elixir
 defmodule RunWithTimeout do
@@ -283,10 +287,10 @@ defmodule OllamaClient do
       Jason.encode!(%{
         "model" => model,
         "messages" => [
-          %{
-            "role" => "system",
-            "content" => @sys_prompt
-          },
+          # %{
+          #   "role" => "system",
+          #   "content" => @sys_prompt
+          # },
           %{
             "role" => "user",
             "content" => prompt
@@ -332,12 +336,12 @@ defmodule EvaluateCode do
           fn ->
             # System.cmd("#{File.cwd!()}/test", [], stderr_to_stdout: true)
             # args = ["run", "--rm", "--platform", "linux/amd64", "-i", "-v", "#{File.cwd!()}/test.d:/test.d", "-v", "#{File.cwd!()}/input.txt:/input.txt", "dlang2/dmd-ubuntu", "/bin/bash", "-c", "dmd test.d && ./test"]
-            args = ["test#{Constants.file_ext()}"]
+            args = ["run", "test#{Constants.file_ext()}"]
 
             System.cmd(Constants.runtime(), args, stderr_to_stdout: true)
             |> IO.inspect(label: "run")
           end,
-          20_000
+          60_000
         )
         |> IO.inspect(label: "here")
 
@@ -382,6 +386,191 @@ defmodule CodeResponseSanitizer do
 end
 
 defmodule TaskSolver do
+  @examples """
+  Here are a few examples of #{Constants.lang()} language solutions for some coding challenge problems:
+  1. Solution for "Day 1: Calculate the final floor" of Part One of the challenge:
+  ```#{Constants.lang()}
+  const std = @import("std");
+
+  pub fn main() !void {
+      var file = try std.fs.cwd().openFile("input.txt", .{});
+      defer file.close();
+
+      var buf_reader = std.io.bufferedReader(file.reader());
+      var in_stream = buf_reader.reader();
+
+      var floor: i32 = 0;
+
+      while (true) {
+          const char = in_stream.readByte() catch |err| switch (err) {
+              error.EndOfStream => break,
+              else => return err,
+          };
+
+          switch (char) {
+              '(' => floor += 1,
+              ')' => floor -= 1,
+              else => unreachable,
+          }
+      }
+
+      std.debug.print("Final floor: {}\n", .{floor});
+  }
+  ```
+  2. Solution for "Day 2: Rock Paper Scissors" of the Part One of the challenge:
+  ```#{Constants.lang()}
+  const std = @import("std");
+
+  pub fn main() !void {
+      var file = try std.fs.cwd().openFile("input.txt", .{});
+      defer file.close();
+
+      var reader = std.io.bufferedReader(file.reader());
+      var line_reader = reader.reader();
+
+      var total_score: i32 = 0;
+
+      var buffer: [1024]u8 = undefined;
+      while (try line_reader.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
+          const opponent = line[0];
+          const your_move = line[2];
+
+          var score: i32 = 0;
+          if (your_move == 'X') {
+              score = 1;
+          } else if (your_move == 'Y') {
+              score = 2;
+          } else if (your_move == 'Z') {
+              score = 3;
+          }
+
+          if ((opponent == 'A' and your_move == 'Y') or (opponent == 'B' and your_move == 'Z') or (opponent == 'C' and your_move == 'X')) {
+              score += 6;
+          } else if ((opponent == 'A' and your_move == 'X') or (opponent == 'B' and your_move == 'Y') or (opponent == 'C' and your_move == 'Z')) {
+              score += 3;
+          }
+
+          total_score += score;
+      }
+
+      std.debug.print("{}\n", .{total_score});
+  }
+  ```
+  3. Solution for "Day 18: Boiling Boulders" Part Two of the challenge:
+  ```#{Constants.lang()}
+  const std = @import("std");
+
+  const Pt3 = struct {
+      x: i32,
+      y: i32,
+      z: i32,
+  };
+
+  fn addPt3(p1: Pt3, p2: Pt3) Pt3 {
+      return Pt3{ .x = p1.x + p2.x, .y = p1.y + p2.y, .z = p1.z + p2.z };
+  }
+
+  fn minInt(a: i32, b: i32) i32 {
+      return if (a < b) a else b;
+  }
+
+  fn maxInt(a: i32, b: i32) i32 {
+      return if (a > b) a else b;
+  }
+
+  pub fn main() !void {
+      var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+      defer arena.deinit();
+
+      const allocator = arena.allocator();
+
+      var cubes = std.AutoHashMap(Pt3, void).init(allocator);
+      defer cubes.deinit();
+
+      const neighbors = [6]Pt3{
+          Pt3{ .x = -1, .y = 0, .z = 0 },
+          Pt3{ .x = 1, .y = 0, .z = 0 },
+          Pt3{ .x = 0, .y = -1, .z = 0 },
+          Pt3{ .x = 0, .y = 1, .z = 0 },
+          Pt3{ .x = 0, .y = 0, .z = -1 },
+          Pt3{ .x = 0, .y = 0, .z = 1 },
+      };
+
+      var min_pt = Pt3{ .x = std.math.maxInt(i32), .y = std.math.maxInt(i32), .z = std.math.maxInt(i32) };
+      var max_pt = Pt3{ .x = std.math.minInt(i32), .y = std.math.minInt(i32), .z = std.math.minInt(i32) };
+
+      var file = try std.fs.cwd().openFile("input.txt", .{});
+      defer file.close();
+
+      var reader = file.reader();
+      var buf: [1024]u8 = undefined;
+      var line_reader = std.io.bufferedReader(reader);
+      var in = line_reader.reader();
+
+      while (try in.readUntilDelimiterOrEof(buf[0..], '\n')) |line| {
+          if (line.len == 0) continue;
+
+          var parts = std.mem.split(u8, line, ",");
+          const x = try std.fmt.parseInt(i32, parts.next().?, 10);
+          const y = try std.fmt.parseInt(i32, parts.next().?, 10);
+          const z = try std.fmt.parseInt(i32, parts.next().?, 10);
+
+          const cube = Pt3{ .x = x, .y = y, .z = z };
+          try cubes.put(cube, {});
+
+          min_pt = Pt3{
+              .x = minInt(min_pt.x, cube.x),
+              .y = minInt(min_pt.y, cube.y),
+              .z = minInt(min_pt.z, cube.z),
+          };
+          max_pt = Pt3{
+              .x = maxInt(max_pt.x, cube.x),
+              .y = maxInt(max_pt.y, cube.y),
+              .z = maxInt(max_pt.z, cube.z),
+          };
+      }
+
+      min_pt = addPt3(min_pt, Pt3{ .x = -1, .y = -1, .z = -1 });
+      max_pt = addPt3(max_pt, Pt3{ .x = 1, .y = 1, .z = 1 });
+
+      var faces: usize = 0;
+      var queue = std.ArrayList(Pt3).init(allocator);
+      defer queue.deinit();
+
+      var seen = std.AutoHashMap(Pt3, void).init(allocator);
+      defer seen.deinit();
+
+      try seen.put(min_pt, {});
+      try queue.append(min_pt);
+
+      while (queue.items.len > 0) {
+          const curr = queue.pop();
+
+          for (neighbors) |delta| {
+              const next = addPt3(curr, delta);
+              if (next.x < min_pt.x or
+                  next.y < min_pt.y or
+                  next.z < min_pt.z or
+                  next.x > max_pt.x or
+                  next.y > max_pt.y or
+                  next.z > max_pt.z)
+              {
+                  continue;
+              }
+
+              if (cubes.contains(next)) {
+                  faces += 1;
+              } else if (!seen.contains(next)) {
+                  try seen.put(next, {});
+                  try queue.append(next);
+              }
+          }
+      }
+
+      std.debug.print("{d}\n", .{faces});
+  }
+  ```
+  """
   def call(day, model \\ "gpt-3.5-turbo-0125") do
     # task = Map.fetch!(day, "task")
     input = Map.fetch!(day, "input")
@@ -389,24 +578,8 @@ defmodule TaskSolver do
     solution = Map.fetch!(day, "solution")
 
     # system_prompt = """
-    # You are an expert programmer that writes simple, concise code and no comments or explanation.
-    # Write a #{Constants.lang()} program that it reads its input from a file "input.txt" and solve the following task.
-    # It should print the answer when execute it.
-    #   The program structure should follow this template:
-    # ```#{Constants.lang()}
-    # defmodule Challenge do
-    #   def call do
-    #     # Read input and solve challenge
-    #     result = ...
-
-    #     # Print result
-    #     IO.puts(result)
-    #   end
-    # end
-    # Challenge.call()
-    # ```
-
-    # Aim to write clean, efficient #{Constants.lang()} code that demonstrates strong programming skills.
+    # Write an #{Constants.lang()} program that reads input from a file called input.txt and prints the output to standard output.
+    # Focus on writing clean, efficient code that demonstrates your programming skills by concisely solving the challenge.
 
     # Coding challenge:
     # """
@@ -414,11 +587,12 @@ defmodule TaskSolver do
     system_prompt = """
     You are an expert programmer that writes simple, concise code and no comments or explanation.
     Given this golang program write a #{Constants.lang()} version that it reads its input from a file "input.txt" and solve the following task.
-    The program should print the answer on the stdout and can be run `#{Constants.runtime()} solution#{Constants.file_ext()}`.
-    The program MUST READ its input from a file "input.txt".
-    It should print the answer and exit successfully.
+    The program should print the answer.
 
-    Golang Task:
+    Here are few examples on previous solutions of challenges in #{Constants.lang()}:
+    #{@examples}
+
+    Golang Solution:
     """
 
     path =
@@ -442,10 +616,12 @@ defmodule TaskSolver do
   defp generate_solution(model, propmt, system_prompt) do
     # ft:gpt-3.5-turbo-0125:personal:erlang-0303:8yge7H3W
     # "ft:gpt-3.5-turbo-0125:personal:elixir:90xUsEr3"
+    # "claude-3-haiku-20240307"
 
     # MistralClient.call(model, propmt, system_prompt)
-    # OpenAIClient.call(model, propmt, system_prompt) 
-    (OllamaClient.call(model, propmt, system_prompt) ||
+    # OllamaClient.call(model, propmt, system_prompt)
+    # AnthropicClient.call(model, propmt, system_prompt)
+    (OpenAIClient.call(model, propmt, system_prompt) ||
        "")
     |> IO.inspect(label: "before parse")
     |> CodeResponseSanitizer.call()
@@ -528,7 +704,8 @@ Enum.reduce(dataset_202X, 1, fn day, count ->
   IO.puts(day["name"])
 
   FunctionRunner.run_max_times(
-    fn -> TaskSolver.call(day, "neural-chat") end,
+    # growthwtf/hermes2pro7b, "claude-3-haiku-20240307"
+    fn -> TaskSolver.call(day, "gpt-4-turbo-preview") end,
     1
   )
 
@@ -537,4 +714,4 @@ Enum.reduce(dataset_202X, 1, fn day, count ->
 end)
 ```
 
-<!-- livebook:{"offset":16706,"stamp":{"token":"XCP.defGO7ObyBvw1VNi8tUNdq1p6chR-YypYCuZfdat9wDEwFbpJffF5YpbzYNmABPYXeKtQLaeuhVvqoF9JnYppLpU1qZt3OwSd4bD0uScSB2cp2orSEKgKttZC5axJiJbL5q3HPJc2d59ZbsbxQ","version":2}} -->
+<!-- livebook:{"offset":21940,"stamp":{"token":"XCP.Vsv7wvX1ZlGZ6uw2110tplSo6T8Ygm1_dDtZEAhvMi3Xn2KFzGdEAfDDzarWTw3PdJM9qH1vas64RaqUa5Y71CBwRYorgd9VGd9A324pXY9Wi18Kp4ep05ZVsBzmzwg8TNH1-K-lH56q39TMM2oj_Bz8Zp7Ir4cDXDVqFo5Pi1GhUbg","version":2}} -->
