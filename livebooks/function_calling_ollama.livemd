@@ -1,0 +1,97 @@
+# Function calling with ollama
+
+```elixir
+Mix.install([
+  :req,
+  :jason
+])
+```
+
+## Module to calculate the distance between to cities in km
+
+```elixir
+defmodule Geo do
+  @earth_radius 6371
+
+  def haversine(lat1, lon1, lat2, lon2) do
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+
+    a =
+      :math.pow(:math.sin(dlat / 2), 2) +
+        :math.cos(radians(lat1)) * :math.cos(radians(lat2)) *
+          :math.pow(:math.sin(dlon / 2), 2)
+
+    c = 2 * :math.atan2(:math.sqrt(a), :math.sqrt(1 - a))
+
+    @earth_radius * c
+  end
+
+  defp radians(degrees) do
+    degrees * :math.pi() / 180
+  end
+end
+
+# London to New York
+distance = Geo.haversine(51.5074, 0.1278, 40.7128, -74.0060)
+IO.puts("The distance is: #{distance} km")
+```
+
+## Find the distance between two cities
+
+```elixir
+defmodule GeoCoordinates do
+  @url "http://localhost:11434/api/chat"
+  @model "adrienbrault/nous-hermes2pro:Q5_K_S"
+
+  def get_city_coordinates(city) do
+    schema =
+      %{
+        "city" => %{
+          "type" => "string",
+          "description" => "Name of the city"
+        },
+        "country" => %{
+          "type" => "string",
+          "description" => "Name of the country in which the city is it"
+        },
+        "lat" => %{
+          "type" => "float",
+          "description" => "Decimal latitude of the city"
+        },
+        "lon" => %{
+          "type" => "float",
+          "description" => "Decimal longitude of the city"
+        }
+      }
+      |> Jason.encode!()
+
+    payload = %{
+      "model" => @model,
+      "messages" => [
+        %{
+          "role" => "system",
+          "content" =>
+            "You are helpful AI assistant. The user will enter city name and the assistant will return decimal latitude and decimal longitute of the city.\nRespond using JSON in the schema defined here:\n#{schema}."
+        },
+        %{"role" => "user", "content" => "#{city}"}
+      ],
+      "stream" => false,
+      "format" => "json"
+    }
+
+    resp = Req.post!(@url, json: payload, receive_timeout: 60_000)
+    (resp.body["message"]["content"] || "{}") |> Jason.decode!()
+  end
+end
+
+city1 = GeoCoordinates.get_city_coordinates("Plovdiv, Bulgaria")
+city2 = GeoCoordinates.get_city_coordinates("Witham, England")
+distance_km = Geo.haversine(city1["lat"], city1["lon"], city2["lat"], city2["lon"])
+
+if city1["country"] == city2["country"] do
+  "The distance between #{city1["city"]} and #{city2["city"]} is #{:erlang.float_to_binary(distance_km, decimals: 2)}km"
+else
+  "The distance between #{city1["city"]}, #{city1["country"]} and #{city2["city"]}, #{city2["country"]} is #{:erlang.float_to_binary(distance_km, decimals: 2)}km"
+end
+```
