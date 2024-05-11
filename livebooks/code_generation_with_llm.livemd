@@ -17,10 +17,10 @@ dataset = File.read!("/Users/isavita/git/advent-of-code/train.json") |> Jason.de
 
 ```elixir
 defmodule Constants do
-  def file_ext, do: ".zig"
-  def lang, do: "zig"
-  def compiler, do: "/opt/homebrew/bin/zig"
-  def runtime, do: "/opt/homebrew/bin/zig"
+  def file_ext, do: ".fs"
+  def lang, do: "fsharp"
+  def compiler, do: "/opt/homebrew/bin/dotnet"
+  def runtime, do: "/opt/homebrew/bin/dotnet"
 end
 
 Constants.runtime()
@@ -28,26 +28,41 @@ Constants.runtime()
 
 ```elixir
 program = ~S|
-const std = @import("std");
+// HelloWorld.fs
+open System
 
-pub fn main() void {
-    std.debug.print("Hello, World!\n", .{});
-}
+[<EntryPoint>]
+let main argv =
+    printfn "Hello, World!"
+    0 // Return an integer exit code
 |
 
 File.write!("test#{Constants.file_ext()}", program)
-# System.cmd(Constants.compiler(), ["task#{Constants.file_ext()}"], stderr_to_stdout: true)
+
+# System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}", "-o", "test"],
+#   stderr_to_stdout: true
+# )
+
 # System.cmd("chmod", ["+x", "test#{Constants.file_ext()}"])
 # System.cmd("#{File.cwd!()}/test", [], stderr_to_stdout: true)
 # "#{File.cwd!()}/test#{Constants.file_ext()}"
-# 
+current_path = System.get_env("PATH")
+
+# Specify the directory where the 'node' binary can be found (not the path to the 'coffee' binary itself)
+node_bin_path = "/opt/homebrew/bin/nim"
+
+# Append the node_bin_path to the existing PATH
+new_path = "#{node_bin_path}:#{current_path}"
 # System.cmd("/Users/isavita/test.sh", [])
 # System.cmd(Constants.runtime(), ["script", "test#{Constants.file_ext()}"], stderr_to_stdout: true)
-System.cmd(Constants.runtime(), ["run", "test#{Constants.file_ext()}"], stderr_to_stdout: true)
+System.cmd(Constants.runtime(), ["fsi", "test#{Constants.file_ext()}"],
+  stderr_to_stdout: true,
+  env: [{"PATH", new_path}, {"LC_ALL", "en_US.UTF-8"}, {"LANG", "en_US.UTF-8"}]
+)
 ```
 
 ```elixir
-solutions = File.ls!("#{File.cwd!()}/code/advent_generated/zig")
+solutions = File.ls!("#{File.cwd!()}/code/advent_generated/fsharp")
 solved_parts = Enum.map(solutions, &String.replace(&1, Constants.file_ext(), ""))
 
 dataset_202X =
@@ -167,7 +182,7 @@ defmodule AnthropicClient do
       "messages" => [
         %{"role" => "user", "content" => prompt}
       ],
-      "temperature" => 0.1,
+      "temperature" => 0.5,
       "stream" => false
     }
 
@@ -195,6 +210,58 @@ defmodule AnthropicClient do
       "x-api-key" => System.fetch_env!("LB_ANTHROPIC_API_KEY")
     }
   end
+end
+```
+
+```elixir
+defmodule GroqClient do
+  # 5 mins
+  @timeout 300_000
+  @url "https://api.groq.com/openai/v1/chat/completions"
+  @system_prompt ~s|You are a highly experienced programmer with a PhD in computer science participating in a coding challenge.
+Write clean, efficient code without unnecessary comments, demonstrating your advanced skills by solving problems practically and concisely.
+Aim to produce optimal and concise solutions, leveraging your decade of industry experience.|
+
+  def call(model, prompt, system_prompt \\ @system_prompt) do
+    payload =
+      %{
+        "messages" => [
+          %{
+            "role" => "system",
+            "content" => system_prompt
+          },
+          %{
+            "role" => "user",
+            "content" => prompt
+          }
+        ],
+        "model" => model,
+        "temperature" => 0.7,
+        "stream" => false
+      }
+      |> Jason.encode!()
+
+    resp = Req.post!(@url, body: payload, headers: headers(), receive_timeout: @timeout)
+
+    if resp.status == 200 do
+      resp.body
+      |> Map.get("choices", [%{}])
+      |> hd()
+      |> get_in(["message", "content"])
+    else
+      "please try again"
+    end
+  end
+
+  defp headers do
+    [
+      {"authorization", "Bearer #{groq_api_key()}"},
+      {"content-type", "application/json"},
+      {"accept", "application/json"}
+    ]
+  end
+
+  defp groq_api_key, do: System.fetch_env!("LB_GROQ_API_KEY")
 end
 ```
 
@@ -296,7 +363,8 @@ defmodule OllamaClient do
             "content" => prompt
           }
         ],
-        "stream" => false
+        "stream" => false,
+        "temperature" => 0.5
       })
 
     case Req.post(@url, body: payload, receive_timeout: @timeout) do
@@ -326,7 +394,9 @@ defmodule EvaluateCode do
       File.write!("test#{Constants.file_ext()}", code |> IO.inspect(label: "code"))
       File.write!("input.txt", file_content)
 
-      # System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
+      # System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}", "-o", "test"],
+      #   stderr_to_stdout: true
+      # )
 
       # System.cmd(Constants.compiler(), ["-framework", "Foundation", "test#{Constants.file_ext()}", "-o", "test"]) |> IO.inspect(label: 1)
       # System.cmd("chmod", ["+x", "test#{Constants.file_ext()}"]) |> IO.inspect(label: 2)
@@ -336,12 +406,20 @@ defmodule EvaluateCode do
           fn ->
             # System.cmd("#{File.cwd!()}/test", [], stderr_to_stdout: true)
             # args = ["run", "--rm", "--platform", "linux/amd64", "-i", "-v", "#{File.cwd!()}/test.d:/test.d", "-v", "#{File.cwd!()}/input.txt:/input.txt", "dlang2/dmd-ubuntu", "/bin/bash", "-c", "dmd test.d && ./test"]
-            args = ["run", "test#{Constants.file_ext()}"]
+            args = ["-f", "test#{Constants.file_ext()}"]
+            # args = []
 
-            System.cmd(Constants.runtime(), args, stderr_to_stdout: true)
+            current_path = System.get_env("PATH")
+            node_bin_path = "/Users/isavita/.nvm/versions/node/v19.8.1/bin"
+            new_path = "#{node_bin_path}:#{current_path}"
+
+            System.cmd(Constants.runtime(), args,
+              stderr_to_stdout: true,
+              env: [{"PATH", new_path}, {"LC_ALL", "en_US.UTF-8"}, {"LANG", "en_US.UTF-8"}]
+            )
             |> IO.inspect(label: "run")
           end,
-          60_000
+          30_000
         )
         |> IO.inspect(label: "here")
 
@@ -388,217 +466,156 @@ end
 defmodule TaskSolver do
   @examples """
   Here are a few examples of #{Constants.lang()} language solutions for some coding challenge problems:
-  1. Solution for "Day 1: Calculate the final floor" of Part One of the challenge:
+  1. Solution for "--- Day 1: Calorie Counting ---" of Part One of the challenge:
   ```#{Constants.lang()}
-  const std = @import("std");
+  #!/bin/bash
 
-  pub fn main() !void {
-      var file = try std.fs.cwd().openFile("input.txt", .{});
-      defer file.close();
+  maxCalories=0
+  currentCalories=0
 
-      var buf_reader = std.io.bufferedReader(file.reader());
-      var in_stream = buf_reader.reader();
+  while IFS= read -r line || [ -n "$line" ]; do
+    if [ -z "$line" ]; then
+        if [ $currentCalories -gt $maxCalories ]; then
+            maxCalories=$currentCalories
+        fi
+        currentCalories=0
+        continue
+    fi
 
-      var floor: i32 = 0;
+    currentCalories=$((currentCalories + line))
+  done < "input.txt"
 
-      while (true) {
-          const char = in_stream.readByte() catch |err| switch (err) {
-              error.EndOfStream => break,
-              else => return err,
-          };
+  if [ $currentCalories -gt $maxCalories ]; then
+    maxCalories=$currentCalories
+  fi
 
-          switch (char) {
-              '(' => floor += 1,
-              ')' => floor -= 1,
-              else => unreachable,
-          }
-      }
-
-      std.debug.print("Final floor: {}\n", .{floor});
-  }
+  echo $maxCalories
   ```
-  2. Solution for "Day 2: Rock Paper Scissors" of the Part One of the challenge:
+  2. Solution for "--- Day 4: Secure Container ---" of the Part One of the challenge:
   ```#{Constants.lang()}
-  const std = @import("std");
+  #!/bin/bash
 
-  pub fn main() !void {
-      var file = try std.fs.cwd().openFile("input.txt", .{});
-      defer file.close();
+  read -r rangeStr < input.txt
+  IFS='-' read -r start end <<< "$rangeStr"
 
-      var reader = std.io.bufferedReader(file.reader());
-      var line_reader = reader.reader();
+  count=0
 
-      var total_score: i32 = 0;
+  for ((i=start; i<=end; i++)); do
+  s="$i"
+  hasDouble=false
+  prevChar=${s:0:1}
+  for ((j=1; j<${#s}; j++)); do
+    currChar=${s:j:1}
+    if [ "$prevChar" == "$currChar" ]; then
+      hasDouble=true
+    fi
+    if [ "$prevChar" \> "$currChar" ]; then
+      hasDouble=false
+      break
+    fi
+    prevChar="$currChar"
+  done
+  if $hasDouble; then
+    ((count++))
+  fi
+  done
 
-      var buffer: [1024]u8 = undefined;
-      while (try line_reader.readUntilDelimiterOrEof(&buffer, '\n')) |line| {
-          const opponent = line[0];
-          const your_move = line[2];
-
-          var score: i32 = 0;
-          if (your_move == 'X') {
-              score = 1;
-          } else if (your_move == 'Y') {
-              score = 2;
-          } else if (your_move == 'Z') {
-              score = 3;
-          }
-
-          if ((opponent == 'A' and your_move == 'Y') or (opponent == 'B' and your_move == 'Z') or (opponent == 'C' and your_move == 'X')) {
-              score += 6;
-          } else if ((opponent == 'A' and your_move == 'X') or (opponent == 'B' and your_move == 'Y') or (opponent == 'C' and your_move == 'Z')) {
-              score += 3;
-          }
-
-          total_score += score;
-      }
-
-      std.debug.print("{}\n", .{total_score});
-  }
+  echo $count
   ```
-  3. Solution for "Day 18: Boiling Boulders" Part Two of the challenge:
+  3. Solution for "--- Day 19: A Series of Tubes ---" Part Two of the challenge:
   ```#{Constants.lang()}
-  const std = @import("std");
+  #!/bin/bash
 
-  const Pt3 = struct {
-      x: i32,
-      y: i32,
-      z: i32,
-  };
+  file="input.txt"
+  grid=()
+  x=0
+  y=0
 
-  fn addPt3(p1: Pt3, p2: Pt3) Pt3 {
-      return Pt3{ .x = p1.x + p2.x, .y = p1.y + p2.y, .z = p1.z + p2.z };
-  }
+  while IFS= read -r line; do
+    grid+=("$line")
+  done < "$file"
 
-  fn minInt(a: i32, b: i32) i32 {
-      return if (a < b) a else b;
-  }
+  for ((i=0; i<${#grid[0]}; i++)); do
+    if [ "${grid[0]:i:1}" = "|" ]; then
+        x=$i
+        break
+    fi
+  done
 
-  fn maxInt(a: i32, b: i32) i32 {
-      return if (a > b) a else b;
-  }
+  dx=0
+  dy=1
+  steps=0
 
-  pub fn main() !void {
-      var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-      defer arena.deinit();
+  while true; do
+    if [ $x -lt 0 ] || [ $x -ge ${#grid[0]} ] || [ $y -lt 0 ] || [ $y -ge ${#grid[@]} ]; then
+        break
+    fi
 
-      const allocator = arena.allocator();
+    cell="${grid[$y]:$x:1}"
 
-      var cubes = std.AutoHashMap(Pt3, void).init(allocator);
-      defer cubes.deinit();
+    if [ "$cell" = " " ]; then
+        break
+    fi
 
-      const neighbors = [6]Pt3{
-          Pt3{ .x = -1, .y = 0, .z = 0 },
-          Pt3{ .x = 1, .y = 0, .z = 0 },
-          Pt3{ .x = 0, .y = -1, .z = 0 },
-          Pt3{ .x = 0, .y = 1, .z = 0 },
-          Pt3{ .x = 0, .y = 0, .z = -1 },
-          Pt3{ .x = 0, .y = 0, .z = 1 },
-      };
+    ((steps++))
 
-      var min_pt = Pt3{ .x = std.math.maxInt(i32), .y = std.math.maxInt(i32), .z = std.math.maxInt(i32) };
-      var max_pt = Pt3{ .x = std.math.minInt(i32), .y = std.math.minInt(i32), .z = std.math.minInt(i32) };
+    if [ "$cell" = "+" ]; then
+        if [ $dx -eq 0 ]; then
+            if [ $x -gt 0 ] && { [ "${grid[$y]:x-1:1}" = "-" ] || [ "${grid[$y]:x-1:1}" = [A-Z] ]; }; then
+                dx=-1
+                dy=0
+            else
+                dx=1
+                dy=0
+            fi
+        else
+            if [ $y -gt 0 ] && { [ "${grid[y-1]:x:1}" = "|" ] || [ "${grid[y-1]:x:1}" = [A-Z] ]; }; then
+                dx=0
+                dy=-1
+            else
+                dx=0
+                dy=1
+            fi
+        fi
+    fi
 
-      var file = try std.fs.cwd().openFile("input.txt", .{});
-      defer file.close();
+    ((x+=dx))
+    ((y+=dy))
+  done
 
-      var reader = file.reader();
-      var buf: [1024]u8 = undefined;
-      var line_reader = std.io.bufferedReader(reader);
-      var in = line_reader.reader();
-
-      while (try in.readUntilDelimiterOrEof(buf[0..], '\n')) |line| {
-          if (line.len == 0) continue;
-
-          var parts = std.mem.split(u8, line, ",");
-          const x = try std.fmt.parseInt(i32, parts.next().?, 10);
-          const y = try std.fmt.parseInt(i32, parts.next().?, 10);
-          const z = try std.fmt.parseInt(i32, parts.next().?, 10);
-
-          const cube = Pt3{ .x = x, .y = y, .z = z };
-          try cubes.put(cube, {});
-
-          min_pt = Pt3{
-              .x = minInt(min_pt.x, cube.x),
-              .y = minInt(min_pt.y, cube.y),
-              .z = minInt(min_pt.z, cube.z),
-          };
-          max_pt = Pt3{
-              .x = maxInt(max_pt.x, cube.x),
-              .y = maxInt(max_pt.y, cube.y),
-              .z = maxInt(max_pt.z, cube.z),
-          };
-      }
-
-      min_pt = addPt3(min_pt, Pt3{ .x = -1, .y = -1, .z = -1 });
-      max_pt = addPt3(max_pt, Pt3{ .x = 1, .y = 1, .z = 1 });
-
-      var faces: usize = 0;
-      var queue = std.ArrayList(Pt3).init(allocator);
-      defer queue.deinit();
-
-      var seen = std.AutoHashMap(Pt3, void).init(allocator);
-      defer seen.deinit();
-
-      try seen.put(min_pt, {});
-      try queue.append(min_pt);
-
-      while (queue.items.len > 0) {
-          const curr = queue.pop();
-
-          for (neighbors) |delta| {
-              const next = addPt3(curr, delta);
-              if (next.x < min_pt.x or
-                  next.y < min_pt.y or
-                  next.z < min_pt.z or
-                  next.x > max_pt.x or
-                  next.y > max_pt.y or
-                  next.z > max_pt.z)
-              {
-                  continue;
-              }
-
-              if (cubes.contains(next)) {
-                  faces += 1;
-              } else if (!seen.contains(next)) {
-                  try seen.put(next, {});
-                  try queue.append(next);
-              }
-          }
-      }
-
-      std.debug.print("{d}\n", .{faces});
-  }
+  echo $steps
+  exit 0
   ```
   """
   def call(day, model \\ "gpt-3.5-turbo-0125") do
-    # task = Map.fetch!(day, "task")
+    task = Map.fetch!(day, "task")
     input = Map.fetch!(day, "input")
     answer = Map.fetch!(day, "answer")
-    solution = Map.fetch!(day, "solution")
-
-    # system_prompt = """
-    # Write an #{Constants.lang()} program that reads input from a file called input.txt and prints the output to standard output.
-    # Focus on writing clean, efficient code that demonstrates your programming skills by concisely solving the challenge.
-
-    # Coding challenge:
-    # """
+    # solution = Map.fetch!(day, "solution")
 
     system_prompt = """
-    You are an expert programmer that writes simple, concise code and no comments or explanation.
-    Given this golang program write a #{Constants.lang()} version that it reads its input from a file "input.txt" and solve the following task.
-    The program should print the answer.
+    Write an #{Constants.lang()} program that reads input from a file called input.txt and prints the output to standard output.
+    Focus on writing clean, efficient code that demonstrates your programming skills by concisely solving the challenge.
 
-    Here are few examples on previous solutions of challenges in #{Constants.lang()}:
-    #{@examples}
+    **NOTE:** DO NOT forget to add at the top of the code #!/usr/bin/awk
 
-    Golang Solution:
+    Coding challenge:
     """
+
+    # system_prompt = """
+    # You are an expert programmer that writes simple, concise code and no comments or explanation.
+    # Given this golang program write a #{Constants.lang()} version that it reads its input from a file "input.txt" and solve the following task.
+    # The program should print the answer.
+
+    # **NOTE:** Golang is faster language than #{Constants.lang()}, thus you have to try more efficient solution in python!
+
+    # Golang Solution:
+    # """
 
     path =
       ~s|#{System.get_env("HOME")}/code/advent_generated/#{day["name"]}#{Constants.file_ext()}|
 
-    code = generate_solution(model, solution, system_prompt)
+    code = generate_solution(model, task, system_prompt)
 
     with {:ok, result} <- EvaluateCode.call(code, input),
          true <- valid_solution?(result, answer) do
@@ -619,9 +636,11 @@ defmodule TaskSolver do
     # "claude-3-haiku-20240307"
 
     # MistralClient.call(model, propmt, system_prompt)
+
     # OllamaClient.call(model, propmt, system_prompt)
-    # AnthropicClient.call(model, propmt, system_prompt)
-    (OpenAIClient.call(model, propmt, system_prompt) ||
+    # OpenAIClient.call(model, propmt, system_prompt)
+    # AnthropicClient.call(model, propmt, system_prompt) 
+    (GroqClient.call(model, propmt, system_prompt) ||
        "")
     |> IO.inspect(label: "before parse")
     |> CodeResponseSanitizer.call()
@@ -699,19 +718,25 @@ end
 
 ```elixir
 len = length(dataset_202X)
+IO.puts(len)
 
 Enum.reduce(dataset_202X, 1, fn day, count ->
-  IO.puts(day["name"])
-
   FunctionRunner.run_max_times(
     # growthwtf/hermes2pro7b, "claude-3-haiku-20240307"
-    fn -> TaskSolver.call(day, "gpt-4-turbo-preview") end,
+    fn ->
+      TaskSolver.call(
+        day,
+        "llama3-70b-8192" || "dolphin-llama3" || "claude-3-opus-20240229" ||
+          "gpt-4-turbo-2024-04-09"
+      )
+    end,
     1
   )
 
   :io.format("~.1f%\n", [count / len * 100])
+  Process.sleep(15_000)
   count + 1
 end)
 ```
 
-<!-- livebook:{"offset":21940,"stamp":{"token":"XCP.Vsv7wvX1ZlGZ6uw2110tplSo6T8Ygm1_dDtZEAhvMi3Xn2KFzGdEAfDDzarWTw3PdJM9qH1vas64RaqUa5Y71CBwRYorgd9VGd9A324pXY9Wi18Kp4ep05ZVsBzmzwg8TNH1-K-lH56q39TMM2oj_Bz8Zp7Ir4cDXDVqFo5Pi1GhUbg","version":2}} -->
+<!-- livebook:{"offset":21389,"stamp":{"token":"XCP.RqsgNWgU8xIqSpEsfj8DB-y36ak6mdE9W7dLtjyhIP7ewd__yNPOacSqmRLShgx-n20ZnWQC2EY3XWFTyVhtjQtFDjnkmlusiONDIxKvFEiprBDstBSmSwn1FuNB4O8Ze9puMhIb7O8kgbLstJB8WFDGyakg8IjOPyTI7t-h9vq5rMg4KMQk7WfRv6DqEh5oyM8XKg","version":2}} -->

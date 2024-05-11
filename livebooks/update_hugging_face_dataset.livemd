@@ -22,8 +22,8 @@ Enum.count(dataset)
 
 ```elixir
 new_solutions_path = ~s|#{System.get_env("HOME")}/code/advent_generated/|
-lang_ext = ".zig"
-lang = "zig"
+lang_ext = ".awk"
+lang = "awk"
 
 data =
   Enum.reduce(dataset, [], fn solution, acc ->
@@ -60,3 +60,9 @@ data =
 output_path = "#{File.cwd!()}/git/advent-of-code/train.json"
 File.write(output_path, Jason.encode!(data))
 ```
+
+```elixir
+File.read!(output_path) |> Jason.decode!()
+```
+
+<!-- livebook:{"offset":1355,"stamp":{"token":"XCP.WfM1swZ-33AK5YZWD8phm78PABsbWhXjuIdouDRz5WmdLv9TdYM3RdAlPdDIgIFK-fIo0-BYNpqyxu1YNdcbgjwQBc3CjwoYYP8X7X9Wp2u6HZjBC_Oz","version":2}} -->
