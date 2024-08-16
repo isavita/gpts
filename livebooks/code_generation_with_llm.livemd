@@ -17,10 +17,10 @@ dataset = File.read!("/Users/isavita/git/advent-of-code/train.json") |> Jason.de
 
 ```elixir
 defmodule Constants do
-  def file_ext, do: ".fs"
-  def lang, do: "fsharp"
-  def compiler, do: "/opt/homebrew/bin/dotnet"
-  def runtime, do: "/opt/homebrew/bin/dotnet"
+  def file_ext, do: ".wren"
+  def lang, do: "wren"
+  def compiler, do: "/opt/homebrew/bin/wren_cli"
+  def runtime, do: "/opt/homebrew/bin/wren_cli"
 end
 
 Constants.runtime()
@@ -28,41 +28,36 @@ Constants.runtime()
 
 ```elixir
 program = ~S|
-// HelloWorld.fs
-open System
-
-[<EntryPoint>]
-let main argv =
-    printfn "Hello, World!"
-    0 // Return an integer exit code
+System.print("Hello, World!")
 |
 
 File.write!("test#{Constants.file_ext()}", program)
 
-# System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}", "-o", "test"],
-#   stderr_to_stdout: true
-# )
+# System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}", "-o", "test"], stderr_to_stdout: true)
 
-# System.cmd("chmod", ["+x", "test#{Constants.file_ext()}"])
+# new_path = "#{System.get_env("PATH")}:/opt/homebrew/bin/"
+# System.cmd(Constants.compiler(), ["-framework", "Foundation", "-o", "test", "test#{Constants.file_ext()}"], stderr_to_stdout: true)
+# System.cmd("/bin/chmod", ["755", "test#{Constants.file_ext()}"])
 # System.cmd("#{File.cwd!()}/test", [], stderr_to_stdout: true)
 # "#{File.cwd!()}/test#{Constants.file_ext()}"
-current_path = System.get_env("PATH")
+# current_path = System.get_env("PATH")
 
-# Specify the directory where the 'node' binary can be found (not the path to the 'coffee' binary itself)
-node_bin_path = "/opt/homebrew/bin/nim"
+# # Specify the directory where the 'node' binary can be found (not the path to the 'coffee' binary itself)
+node_path = "/Users/isavita/.nvm/versions/node/v19.8.1/bin:#{System.get_env("PATH")}"
 
-# Append the node_bin_path to the existing PATH
-new_path = "#{node_bin_path}:#{current_path}"
-# System.cmd("/Users/isavita/test.sh", [])
-# System.cmd(Constants.runtime(), ["script", "test#{Constants.file_ext()}"], stderr_to_stdout: true)
-System.cmd(Constants.runtime(), ["fsi", "test#{Constants.file_ext()}"],
+# # # Append the node_bin_path to the existing PATH
+# # new_path = "#{node_bin_path}:#{current_path}"
+# System.cmd("/bin/bash", ["test.sh"])
+# # System.cmd(Constants.runtime(), ["dotnet", "run", "--project", "test"], stderr_to_stdout: true)
+
+System.cmd(Constants.runtime(), ["test#{Constants.file_ext()}"],
   stderr_to_stdout: true,
-  env: [{"PATH", new_path}, {"LC_ALL", "en_US.UTF-8"}, {"LANG", "en_US.UTF-8"}]
+  env: [{"PATH", node_path}, {"LC_ALL", "en_US.UTF-8"}, {"LANG", "en_US.UTF-8"}]
 )
 ```
 
 ```elixir
-solutions = File.ls!("#{File.cwd!()}/code/advent_generated/fsharp")
+solutions = File.ls!("#{File.cwd!()}/code/advent_generated/")
 solved_parts = Enum.map(solutions, &String.replace(&1, Constants.file_ext(), ""))
 
 dataset_202X =
@@ -94,7 +89,7 @@ defmodule MistralClient do
         "messages" => [
           %{"role" => "user", "content" => prompt}
         ],
-        "temperature" => 0.7,
+        "temperature" => 0.5,
         "stream" => false
       }
       |> Jason.encode!()
@@ -127,12 +122,15 @@ Write clean, efficient code without unnecessary comments, demonstrating your adv
 Aim to produce optimal and concise solutions, leveraging your decade of industry experience.|
 
   def call(model, prompt, system_prompt \\ @system_prompt) do
+    sys_prompt =
+      "You are a highly experienced programmer with a PhD in computer science participating in a coding challenge.\nWrite clean, efficient code without unnecessary comments, demonstrating your advanced skills by solving problems practically and concisely.\nAim to produce optimal and concise solutions, leveraging your decade of industry experience."
+
     payload =
       %{
         "model" => model,
         "temperature" => 0.5,
         "messages" => [
-          %{"role" => "system", "content" => system_prompt},
+          %{"role" => "system", "content" => sys_prompt},
           %{"role" => "user", "content" => "#{system_prompt}\n#{prompt}"}
         ]
       }
@@ -152,7 +150,7 @@ Aim to produce optimal and concise solutions, leveraging your decade of industry
     ]
   end
 
-  defp openai_api_key, do: System.fetch_env!("LB_OPENAI_API_KEY")
+  defp openai_api_key, do: System.fetch_env!("LB_OPENAI_API_FT_KEY" || "LB_OPENAI_API_KEY")
 end
 ```
 
@@ -394,6 +392,14 @@ defmodule EvaluateCode do
       File.write!("test#{Constants.file_ext()}", code |> IO.inspect(label: "code"))
       File.write!("input.txt", file_content)
 
+      # System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
+      # System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}", "-include-runtime", "-d", "test.jar"], stderr_to_stdout: true)
+
+      # System.cmd("/bin/chmod", ["755", "test#{Constants.file_ext()}"])
+
+      # System.cmd(Constants.compiler(), ["-framework", "Foundation", "-o", "test", "test#{Constants.file_ext()}"], stderr_to_stdout: true)
+
+      # System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
       # System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}", "-o", "test"],
       #   stderr_to_stdout: true
       # )
@@ -406,20 +412,28 @@ defmodule EvaluateCode do
           fn ->
             # System.cmd("#{File.cwd!()}/test", [], stderr_to_stdout: true)
             # args = ["run", "--rm", "--platform", "linux/amd64", "-i", "-v", "#{File.cwd!()}/test.d:/test.d", "-v", "#{File.cwd!()}/input.txt:/input.txt", "dlang2/dmd-ubuntu", "/bin/bash", "-c", "dmd test.d && ./test"]
-            args = ["-f", "test#{Constants.file_ext()}"]
-            # args = []
+            args = ["test#{Constants.file_ext()}"]
+            # args = ["test#{Constants.file_ext()}"]
+            # args = ["-jar", "test.jar"]
+            # args = ["-q", "-f", "test#{Constants.file_ext()}", "-t", "halt"]
 
-            current_path = System.get_env("PATH")
-            node_bin_path = "/Users/isavita/.nvm/versions/node/v19.8.1/bin"
-            new_path = "#{node_bin_path}:#{current_path}"
+            # current_path = System.get_env("PATH")
+            # node_bin_path = "/Users/isavita/.nvm/versions/node/v19.8.1/bin"
+            # new_path = "#{node_bin_path}:#{current_path}"
+
+            # System.cmd(Constants.runtime(), args,
+            #   stderr_to_stdout: true
+            #   # env: [{"PATH", new_path}, {"LC_ALL", "en_US.UTF-8"}, {"LANG", "en_US.UTF-8"}]
+            # )
+            node_path = "/Users/isavita/.nvm/versions/node/v19.8.1/bin:#{System.get_env("PATH")}"
 
             System.cmd(Constants.runtime(), args,
               stderr_to_stdout: true,
-              env: [{"PATH", new_path}, {"LC_ALL", "en_US.UTF-8"}, {"LANG", "en_US.UTF-8"}]
+              env: [{"PATH", node_path}, {"LC_ALL", "en_US.UTF-8"}, {"LANG", "en_US.UTF-8"}]
             )
             |> IO.inspect(label: "run")
           end,
-          30_000
+          60_000
         )
         |> IO.inspect(label: "here")
 
@@ -456,7 +470,7 @@ end
 
 defmodule CodeResponseSanitizer do
   def call(input) when is_binary(input) do
-    case Regex.scan(~r/```(?:#{Constants.lang()})?(.*?)```/sim, input) do
+    case Regex.scan(~r/```(?:#{Constants.lang()}|objective-c|objc)?(.*?)```/sim, input) do
       [[_full_match, code] | _tail] -> code
       _ -> input |> IO.inspect(label: "NO MATCH")
     end
@@ -597,8 +611,6 @@ defmodule TaskSolver do
     Write an #{Constants.lang()} program that reads input from a file called input.txt and prints the output to standard output.
     Focus on writing clean, efficient code that demonstrates your programming skills by concisely solving the challenge.
 
-    **NOTE:** DO NOT forget to add at the top of the code #!/usr/bin/awk
-
     Coding challenge:
     """
 
@@ -606,8 +618,6 @@ defmodule TaskSolver do
     # You are an expert programmer that writes simple, concise code and no comments or explanation.
     # Given this golang program write a #{Constants.lang()} version that it reads its input from a file "input.txt" and solve the following task.
     # The program should print the answer.
-
-    # **NOTE:** Golang is faster language than #{Constants.lang()}, thus you have to try more efficient solution in python!
 
     # Golang Solution:
     # """
@@ -635,12 +645,11 @@ defmodule TaskSolver do
     # "ft:gpt-3.5-turbo-0125:personal:elixir:90xUsEr3"
     # "claude-3-haiku-20240307"
 
-    # MistralClient.call(model, propmt, system_prompt)
-
     # OllamaClient.call(model, propmt, system_prompt)
-    # OpenAIClient.call(model, propmt, system_prompt)
     # AnthropicClient.call(model, propmt, system_prompt) 
-    (GroqClient.call(model, propmt, system_prompt) ||
+    # (MistralClient.call(model, propmt, system_prompt) ||
+    # (GroqClient.call(model, propmt, system_prompt) ||
+    (OpenAIClient.call(model, propmt, system_prompt) ||
        "")
     |> IO.inspect(label: "before parse")
     |> CodeResponseSanitizer.call()
@@ -726,7 +735,8 @@ Enum.reduce(dataset_202X, 1, fn day, count ->
     fn ->
       TaskSolver.call(
         day,
-        "llama3-70b-8192" || "dolphin-llama3" || "claude-3-opus-20240229" ||
+        "gpt-4o-mini" || "mistral-large-2407" || "llama-3.1-70b-versatile" ||
+          "claude-3-opus-20240229" ||
           "gpt-4-turbo-2024-04-09"
       )
     end,
@@ -734,9 +744,9 @@ Enum.reduce(dataset_202X, 1, fn day, count ->
   )
 
   :io.format("~.1f%\n", [count / len * 100])
-  Process.sleep(15_000)
+  Process.sleep(1_000)
   count + 1
 end)
 ```
 
-<!-- livebook:{"offset":21389,"stamp":{"token":"XCP.RqsgNWgU8xIqSpEsfj8DB-y36ak6mdE9W7dLtjyhIP7ewd__yNPOacSqmRLShgx-n20ZnWQC2EY3XWFTyVhtjQtFDjnkmlusiONDIxKvFEiprBDstBSmSwn1FuNB4O8Ze9puMhIb7O8kgbLstJB8WFDGyakg8IjOPyTI7t-h9vq5rMg4KMQk7WfRv6DqEh5oyM8XKg","version":2}} -->
+<!-- livebook:{"offset":22788,"stamp":{"token":"XCP.VQbp1mGzctMhP07PwSp94KN8SqeouvP9fr9k9ugzR6lokXc8HBPNiXODm2djhU7lBXJUBRHZoKy8oTkfxR9fwORj9whBHPHVZqiSYnJ0s-_eLM8uemNW6UICX0edI2_Co2gm8yYo_ypS6D1016Ag1fmAtcevOgMgVGSDqvOT79OWn-PS-pBsm2V3nNx5ASQm08fEvNQD2bnq1uY417YQENczeNlfvhPzmcc","version":2}} -->

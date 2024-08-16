@@ -1,0 +1,249 @@
+# OpenAI Structured Output Demo
+
+```elixir
+Mix.install(
+  [
+    :req,
+    :jason,
+    :kino
+  ]
+)
+```
+
+## OpenAIClient
+
+```elixir
+defmodule OpenAIClient do
+  @timeout 60_000
+  @base_url "https://api.openai.com/v1"
+
+  def call(model, messages, opts \\ []) do
+    body = %{
+      model: model,
+      messages: messages
+    }
+    |> Map.merge(Map.new(opts))
+
+    request(body)
+    |> Map.get(:body)
+  end
+
+  def get_response_message(body) do
+    get_in(body, ["choices", Access.at(0), "message", "content"])
+  end
+
+  def generate_webpage(prompt, model \\ "gpt-4o-2024-08-06") do
+    response_format = 
+      %{
+        type: "json_schema",
+        json_schema: %{
+          name: "webpage_content",
+          schema: %{
+            type: "object",
+            properties: %{
+              html: %{
+                type: "string",
+                description: "The complete HTML content of the webpage"
+              },
+              css: %{
+                type: "string",
+                description: "The CSS styles for the webpage"
+              },
+              js: %{
+                type: "string",
+                description: "The JavaScript code for the webpage"
+              }
+            },
+            required: ["html", "css", "js"],
+            additionalProperties: false
+          },
+          strict: true
+        }
+      }
+
+    body = %{
+      model: model,
+      messages: [
+        %{
+          role: "system",
+          content: "You are a web developer. Create a single HTML file with embedded CSS and JavaScript based on the user's request. The HTML should be valid and self-contained."
+        },
+        %{
+          role: "user",
+          content: prompt
+        }
+      ],
+      response_format: response_format
+    }
+
+    response = request(body)
+
+    case response do
+      %{status: 200, body: body} ->
+        body
+        |> get_response_message()
+        |> Jason.decode!()
+      _ ->
+        raise "API call failed: #{inspect(response.body)}"
+    end
+  end
+
+  defp request(body) do
+    api_key = System.fetch_env!("LB_OPENAI_API_KEY")
+    
+    Req.post!(
+      "#{@base_url}/chat/completions",
+      json: body,
+      headers: [
+        {"Authorization", "Bearer #{api_key}"},
+        {"Content-Type", "application/json"}
+      ],
+      receive_timeout: @timeout
+    )
+  end
+end
+```
+
+## Test API Call
+
+```elixir
+# response = OpenAIClient.call("gpt-4o-mini", [
+#   %{role: "system", content: "You are a helpful assistant."},
+#   %{role: "user", content: "Write a haiku that explains the concept of recursion."}
+# ])
+
+# IO.puts(response |> OpenAIClient.get_response_message())
+```
+
+## Create an input form using Kino
+
+```elixir
+form = Kino.Control.form(
+  [
+    model: Kino.Input.text("Model", default: "gpt-4o-mini"),
+    system_message: Kino.Input.textarea("System Message", default: "You are a meticulous Elixir code reviewer who adheres to best practices and advocates for simplicity in coding."),
+    user_message: Kino.Input.textarea("User Message"),
+    temperature: Kino.Input.number("Temperature", default: 0.3)
+  ],
+  submit: "Send Request"
+)
+```
+
+## Handle form submission
+
+````elixir
+# # Simple example
+# Kino.listen(form, fn %{data: data, origin: origin} ->
+#   IO.inspect(data)
+#   IO.inspect(origin)
+# end)
+
+# Complex example
+# Create a frame to display the result
+result_frame = Kino.Frame.new()
+# Handle form submission
+Kino.listen(form, fn %{data: data, origin: _origin} ->
+  messages = [
+    %{role: "system", content: data.system_message},
+    %{role: "user", content: data.user_message}
+  ]
+  
+  opts = [temperature: data.temperature]
+
+  response = OpenAIClient.call(data.model, messages, opts) |> IO.inspect()
+
+  # Pretty print the JSON response
+  formatted_response = OpenAIClient.get_response_message(response) # Jason.encode!(response, pretty: true)
+  
+  Kino.Frame.render(result_frame, Kino.Markdown.new("```json\n#{formatted_response}\n```"))
+end)
+
+Kino.Layout.grid([
+  form,
+  result_frame
+])
+````
+
+## Demo to build HTML page
+
+````elixir
+# Create an input form using Kino
+input_form = Kino.Control.form(
+  [
+    prompt: Kino.Input.textarea("Describe the webpage you want to create")
+  ],
+  submit: "Generate Webpage"
+)
+
+# Create frames to display the result
+html_frame = Kino.Frame.new()
+css_frame = Kino.Frame.new()
+js_frame = Kino.Frame.new()
+preview_frame = Kino.Frame.new()
+
+# Handle form submission
+Kino.listen(input_form, fn %{data: %{prompt: prompt}} ->
+  response = OpenAIClient.generate_webpage(prompt) |> IO.inspect()
+  
+  html_content = response["html"]
+  css_content = response["css"]
+  js_content = response["js"]
+
+  # Combine HTML, CSS, and JS for preview
+  full_html = """
+  <html>
+    <head>
+      <style>#{css_content}</style>
+    </head>
+    <body>
+      #{html_content}
+      <script>#{js_content}</script>
+    </body>
+  </html>
+  """
+
+  # Display the HTML content
+  Kino.Frame.render(html_frame, 
+    Kino.Markdown.new("```html\n#{html_content}\n```")
+  )
+
+  # Display the CSS content
+  Kino.Frame.render(css_frame, 
+    Kino.Markdown.new("```css\n#{css_content}\n```")
+  )
+
+  # Display the JS content
+  Kino.Frame.render(js_frame, 
+    Kino.Markdown.new("```javascript\n#{js_content}\n```")
+  )
+
+  # Display the preview
+  Kino.Frame.render(preview_frame, 
+    Kino.HTML.new(full_html)
+  )
+end)
+
+text = """
+1. Choose a cool name for the cow, like "Gunner the Arsenal Cow."
+2. Create a homepage with a catchy headline like "Book Your Picture with Gunner the Arsenal Cow Near the Emirates Stadium!"
+3. Add a description of the experience, location details (near Emirates Stadium, London), and pricing information.
+4. Include a calendar or booking system where users can select a date and time slot.
+5. Set up an online payment system using Stripe or PayPal.
+6. Add testimonials or a gallery of previous visitors with Gunner to build credibility.
+"""
+
+Kino.Layout.grid([
+  Kino.Markdown.new("## Input Form"),
+  input_form,
+  Kino.Markdown.new("## HTML"),
+  html_frame,
+  Kino.Markdown.new("## CSS"),
+  css_frame,
+  Kino.Markdown.new("## JavaScript"),
+  js_frame,
+  Kino.Markdown.new("## Preview"),
+  preview_frame
+], columns: 1)
+````
+
+<!-- livebook:{"offset":6110,"stamp":{"token":"XCP.hA_yOeHvAg-oBeKvP6DZxNXSA5jlCkPoFTGDWW0TD92Qd0ISdonPK22yxQDPxczQlYmJvuTQmjRdG1NN2n1y5ZoYBffRIknet57cmn1_yPgI0ZBeP1YC1-o","version":2}} -->
