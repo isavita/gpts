@@ -22,8 +22,8 @@ Enum.count(dataset)
 
 ```elixir
 new_solutions_path = ~s|#{System.get_env("HOME")}/code/advent_generated/|
-lang_ext = ".cr"
-lang = "crystal"
+lang_ext = ".js"
+lang = "javascript"
 
 data =
   Enum.reduce(dataset, [], fn solution, acc ->
@@ -65,4 +65,4 @@ File.write(output_path, Jason.encode!(data))
 File.read!(output_path) |> Jason.decode!() |> Enum.count()
 ```
 
-<!-- livebook:{"offset":1374,"stamp":{"token":"XCP.oTqSwaFHjGL-_oXqroXvZludzN4y62XABpu0eZ8KJCZ2yhve99Yzy1aU2-yweM-Xgap4MVyjkbFjxfGHLuKby9-RgxP5KoorTkvszsgJxC9mrun2begM","version":2}} -->
+<!-- livebook:{"offset":1377,"stamp":{"token":"XCP.ri_omTI2-fZyhjog9lGz5-6Ph597aPNJ2kjzKOuymjb4V3mRREFvAm9DIDp_4qgurG1sWRQnHFSE8x3ED_yYD2_P-gHGfgPI_iNH7D69audKiXcwCaBF","version":2}} -->

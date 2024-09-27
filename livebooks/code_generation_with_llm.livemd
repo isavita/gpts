@@ -17,10 +17,10 @@ dataset = File.read!("/Users/isavita/git/advent-of-code/train.json") |> Jason.de
 
 ```elixir
 defmodule Constants do
-  def file_ext, do: ".wren"
-  def lang, do: "wren"
-  def compiler, do: "/opt/homebrew/bin/wren_cli"
-  def runtime, do: "/opt/homebrew/bin/wren_cli"
+  def file_ext, do: ".clj"
+  def lang, do: "clojure"
+  def compiler, do: "/Users/isavita/build.sh"
+  def runtime, do: "/opt/homebrew/bin/clojure"
 end
 
 Constants.runtime()
@@ -28,12 +28,14 @@ Constants.runtime()
 
 ```elixir
 program = ~S|
-System.print("Hello, World!")
+(println "Hello, World")
 |
 
 File.write!("test#{Constants.file_ext()}", program)
 
-# System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}", "-o", "test"], stderr_to_stdout: true)
+# System.cmd("/bin/chmod", ["777", "/Users/isavita/build.sh"])
+
+# System.cmd(Constants.compiler(), [], stderr_to_stdout: true)
 
 # new_path = "#{System.get_env("PATH")}:/opt/homebrew/bin/"
 # System.cmd(Constants.compiler(), ["-framework", "Foundation", "-o", "test", "test#{Constants.file_ext()}"], stderr_to_stdout: true)
@@ -43,21 +45,30 @@ File.write!("test#{Constants.file_ext()}", program)
 # current_path = System.get_env("PATH")
 
 # # Specify the directory where the 'node' binary can be found (not the path to the 'coffee' binary itself)
-node_path = "/Users/isavita/.nvm/versions/node/v19.8.1/bin:#{System.get_env("PATH")}"
+# node_path = "/Users/isavita/.nvm/versions/node/v19.8.1/bin:#{System.get_env("PATH")}"
 
 # # # Append the node_bin_path to the existing PATH
-# # new_path = "#{node_bin_path}:#{current_path}"
+# new_path = "#{node_bin_path}:#{current_path}"
 # System.cmd("/bin/bash", ["test.sh"])
 # # System.cmd(Constants.runtime(), ["dotnet", "run", "--project", "test"], stderr_to_stdout: true)
 
-System.cmd(Constants.runtime(), ["test#{Constants.file_ext()}"],
+# System.cmd(Constants.runtime(), ["-noshell", "-s", "task", "call", "-s", "init", "stop"], stderr_to_stdout: true)
+
+# args = [
+#   "-c",
+#   "/usr/local/bin/docker run --rm -v /Users/isavita:/app dlang2/dmd-ubuntu:latest bash -c \"dmd -run /app/test.d\""
+# ]
+
+args = ["-M", "test#{Constants.file_ext()}"]
+
+System.cmd(Constants.runtime(), args,
   stderr_to_stdout: true,
-  env: [{"PATH", node_path}, {"LC_ALL", "en_US.UTF-8"}, {"LANG", "en_US.UTF-8"}]
+  env: [{"LC_ALL", "en_US.UTF-8"}, {"LANG", "en_US.UTF-8"}, {"GUILE_AUTO_COMPILE", "0"}]
 )
 ```
 
 ```elixir
-solutions = File.ls!("#{File.cwd!()}/code/advent_generated/")
+solutions = File.ls!("#{File.cwd!()}/code/advent_generated/clojure")
 solved_parts = Enum.map(solutions, &String.replace(&1, Constants.file_ext(), ""))
 
 dataset_202X =
@@ -392,7 +403,6 @@ defmodule EvaluateCode do
       File.write!("test#{Constants.file_ext()}", code |> IO.inspect(label: "code"))
       File.write!("input.txt", file_content)
 
-      # System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}"], stderr_to_stdout: true)
       # System.cmd(Constants.compiler(), ["test#{Constants.file_ext()}", "-include-runtime", "-d", "test.jar"], stderr_to_stdout: true)
 
       # System.cmd("/bin/chmod", ["755", "test#{Constants.file_ext()}"])
@@ -412,11 +422,15 @@ defmodule EvaluateCode do
           fn ->
             # System.cmd("#{File.cwd!()}/test", [], stderr_to_stdout: true)
             # args = ["run", "--rm", "--platform", "linux/amd64", "-i", "-v", "#{File.cwd!()}/test.d:/test.d", "-v", "#{File.cwd!()}/input.txt:/input.txt", "dlang2/dmd-ubuntu", "/bin/bash", "-c", "dmd test.d && ./test"]
-            args = ["test#{Constants.file_ext()}"]
+            # args = ["test#{Constants.file_ext()}"]
             # args = ["test#{Constants.file_ext()}"]
             # args = ["-jar", "test.jar"]
             # args = ["-q", "-f", "test#{Constants.file_ext()}", "-t", "halt"]
-
+            # args = [
+            #   "-c",
+            #   "/usr/local/bin/docker run --rm -v /Users/isavita:/app dlang2/dmd-ubuntu:latest bash -c \"cd /app && dmd -run test.d\""
+            # ]
+            args = ["-M", "test#{Constants.file_ext()}"]
             # current_path = System.get_env("PATH")
             # node_bin_path = "/Users/isavita/.nvm/versions/node/v19.8.1/bin"
             # new_path = "#{node_bin_path}:#{current_path}"
@@ -429,7 +443,12 @@ defmodule EvaluateCode do
 
             System.cmd(Constants.runtime(), args,
               stderr_to_stdout: true,
-              env: [{"PATH", node_path}, {"LC_ALL", "en_US.UTF-8"}, {"LANG", "en_US.UTF-8"}]
+              env: [
+                {"PATH", node_path},
+                {"LC_ALL", "en_US.UTF-8"},
+                {"LANG", "en_US.UTF-8"},
+                {"GUILE_AUTO_COMPILE", "0"}
+              ]
             )
             |> IO.inspect(label: "run")
           end,
@@ -480,125 +499,172 @@ end
 defmodule TaskSolver do
   @examples """
   Here are a few examples of #{Constants.lang()} language solutions for some coding challenge problems:
-  1. Solution for "--- Day 1: Calorie Counting ---" of Part One of the challenge:
+  1. Solution:
   ```#{Constants.lang()}
-  #!/bin/bash
+  import std.stdio;
+  import std.file;
+  import std.conv;
 
-  maxCalories=0
-  currentCalories=0
+  struct Ship {
+  int x, y;
+  int facing;
+  }
 
-  while IFS= read -r line || [ -n "$line" ]; do
-    if [ -z "$line" ]; then
-        if [ $currentCalories -gt $maxCalories ]; then
-            maxCalories=$currentCalories
-        fi
-        currentCalories=0
-        continue
-    fi
+  void main() {
+  auto file = File("input.txt", "r");
+  auto ship = Ship(0, 0, 0);
 
-    currentCalories=$((currentCalories + line))
-  done < "input.txt"
+  foreach(line; file.byLine()) {
+  auto action = line[0];
+  auto value = to!int(line[1..$]);
+  processInstruction(ship, action, value);
+  }
 
-  if [ $currentCalories -gt $maxCalories ]; then
-    maxCalories=$currentCalories
-  fi
+  auto manhattanDistance = abs(ship.x) + abs(ship.y);
+  writeln(manhattanDistance);
+  }
 
-  echo $maxCalories
+  void processInstruction(ref Ship ship, char action, int value) {
+  switch (action) {
+  case 'N':
+  	ship.y += value;
+  	break;
+  case 'S':
+  	ship.y -= value;
+  	break;
+  case 'E':
+  	ship.x += value;
+  	break;
+  case 'W':
+  	ship.x -= value;
+  	break;
+  case 'L':
+  	ship.facing = (ship.facing - value + 360) % 360;
+  	break;
+  case 'R':
+  	ship.facing = (ship.facing + value) % 360;
+  	break;
+  case 'F':
+  	switch (ship.facing) {
+  		case 0:
+  			ship.x += value;
+  			break;
+  		case 90:
+  			ship.y -= value;
+  			break;
+  		case 180:
+  			ship.x -= value;
+  			break;
+  		case 270:
+  			ship.y += value;
+  			break;
+  		default:
+  			assert(0, "Invalid facing direction");
+  	}
+  	break;
+  default:
+  	assert(0, "Invalid action");
+  }
+  }
+
+  int abs(int x) {
+  return x < 0 ? -x : x;
+  }
   ```
-  2. Solution for "--- Day 4: Secure Container ---" of the Part One of the challenge:
+  2. Solution:
   ```#{Constants.lang()}
-  #!/bin/bash
+  import std.file;
+  import std.stdio;
 
-  read -r rangeStr < input.txt
-  IFS='-' read -r start end <<< "$rangeStr"
+  void main()
+  {
+    string input = cast(string) read("input.txt");
 
-  count=0
+    int x = 0;
+    int y = 0;
+    int[][] visited;
 
-  for ((i=start; i<=end; i++)); do
-  s="$i"
-  hasDouble=false
-  prevChar=${s:0:1}
-  for ((j=1; j<${#s}; j++)); do
-    currChar=${s:j:1}
-    if [ "$prevChar" == "$currChar" ]; then
-      hasDouble=true
-    fi
-    if [ "$prevChar" \> "$currChar" ]; then
-      hasDouble=false
-      break
-    fi
-    prevChar="$currChar"
-  done
-  if $hasDouble; then
-    ((count++))
-  fi
-  done
+    visited ~= [0, 0];
 
-  echo $count
+    foreach (char direction; input)
+    {
+        if (direction == '^')
+            y++;
+        else if (direction == 'v')
+            y--;
+        else if (direction == '>')
+            x++;
+        else if (direction == '<')
+            x--;
+
+        bool found = false;
+        foreach (coord; visited)
+        {
+            if (coord[0] == x && coord[1] == y)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found)
+            visited ~= [x, y];
+    }
+
+    writeln(visited.length);
+  }
   ```
-  3. Solution for "--- Day 19: A Series of Tubes ---" Part Two of the challenge:
+  3. Solution:
   ```#{Constants.lang()}
-  #!/bin/bash
+  import std.stdio;
+  import std.file;
+  import std.conv;
 
-  file="input.txt"
-  grid=()
-  x=0
-  y=0
+  const favoriteNumber = 1362;
 
-  while IFS= read -r line; do
-    grid+=("$line")
-  done < "$file"
+  struct Point {
+    int x, y;
+  }
 
-  for ((i=0; i<${#grid[0]}; i++)); do
-    if [ "${grid[0]:i:1}" = "|" ]; then
-        x=$i
-        break
-    fi
-  done
+  bool isWall(int x, int y) {
+    int num = x*x + 3*x + 2*x*y + y + y*y + favoriteNumber;
+    int bits;
+    while (num > 0) {
+        if (num % 2 == 1) bits++;
+        num /= 2;
+    }
+    return bits % 2 != 0;
+  }
 
-  dx=0
-  dy=1
-  steps=0
+  int bfsMaxSteps(Point start, int maxSteps) {
+    bool[Point] visited;
+    Point[] queue;
+    queue ~= start;
+    visited[start] = true;
+    ulong steps;  // Change type to ulong
+    while (queue.length > 0 && steps < cast(ulong)maxSteps) {
+        ulong size = cast(ulong)queue.length;  // Cast to ulong
+        for (ulong i = 0; i < size; i++) {
+            Point point = queue[i];
+            foreach (Point delta; [Point(1, 0), Point(-1, 0), Point(0, 1), Point(0, -1)]) {
+                Point next = Point(point.x + delta.x, point.y + delta.y);
+                if (next.x >= 0 && next.y >= 0 && !isWall(next.x, next.y) && !(next in visited)) {
+                    visited[next] = true;
+                    queue ~= next;
+                }
+            }
+        }
+        queue = queue[size..$];
+        steps++;
+    }
+    return cast(int)visited.length;  // Cast to int
+  }
 
-  while true; do
-    if [ $x -lt 0 ] || [ $x -ge ${#grid[0]} ] || [ $y -lt 0 ] || [ $y -ge ${#grid[@]} ]; then
-        break
-    fi
-
-    cell="${grid[$y]:$x:1}"
-
-    if [ "$cell" = " " ]; then
-        break
-    fi
-
-    ((steps++))
-
-    if [ "$cell" = "+" ]; then
-        if [ $dx -eq 0 ]; then
-            if [ $x -gt 0 ] && { [ "${grid[$y]:x-1:1}" = "-" ] || [ "${grid[$y]:x-1:1}" = [A-Z] ]; }; then
-                dx=-1
-                dy=0
-            else
-                dx=1
-                dy=0
-            fi
-        else
-            if [ $y -gt 0 ] && { [ "${grid[y-1]:x:1}" = "|" ] || [ "${grid[y-1]:x:1}" = [A-Z] ]; }; then
-                dx=0
-                dy=-1
-            else
-                dx=0
-                dy=1
-            fi
-        fi
-    fi
-
-    ((x+=dx))
-    ((y+=dy))
-  done
-
-  echo $steps
-  exit 0
+  void main() {
+    Point start = Point(1, 1);
+    int reachableLocations = bfsMaxSteps(start, 50);
+    writeln(reachableLocations);
+  }
   ```
   """
   def call(day, model \\ "gpt-3.5-turbo-0125") do
@@ -618,6 +684,8 @@ defmodule TaskSolver do
     # You are an expert programmer that writes simple, concise code and no comments or explanation.
     # Given this golang program write a #{Constants.lang()} version that it reads its input from a file "input.txt" and solve the following task.
     # The program should print the answer.
+
+    # #{@examples}
 
     # Golang Solution:
     # """
@@ -735,7 +803,8 @@ Enum.reduce(dataset_202X, 1, fn day, count ->
     fn ->
       TaskSolver.call(
         day,
-        "gpt-4o-mini" || "mistral-large-2407" || "llama-3.1-70b-versatile" ||
+        "ft:gpt-4o-2024-08-06:personal:code:9zTedtDh" || "gpt-4o-mini" || "mistral-large-2407" ||
+          "llama-3.1-70b-versatile" ||
           "claude-3-opus-20240229" ||
           "gpt-4-turbo-2024-04-09"
       )
@@ -744,9 +813,9 @@ Enum.reduce(dataset_202X, 1, fn day, count ->
   )
 
   :io.format("~.1f%\n", [count / len * 100])
-  Process.sleep(1_000)
+  Process.sleep(0_000)
   count + 1
 end)
 ```
 
-<!-- livebook:{"offset":22788,"stamp":{"token":"XCP.VQbp1mGzctMhP07PwSp94KN8SqeouvP9fr9k9ugzR6lokXc8HBPNiXODm2djhU7lBXJUBRHZoKy8oTkfxR9fwORj9whBHPHVZqiSYnJ0s-_eLM8uemNW6UICX0edI2_Co2gm8yYo_ypS6D1016Ag1fmAtcevOgMgVGSDqvOT79OWn-PS-pBsm2V3nNx5ASQm08fEvNQD2bnq1uY417YQENczeNlfvhPzmcc","version":2}} -->
+<!-- livebook:{"offset":24491,"stamp":{"token":"XCP.eW7U7-b5ndsdRfc0V0of_xMDLK1koQdkKj9HMI9Qk6PqO8thAe_c5ws2Kq73hpvwb4ZiUWJ2tctBNLBDPVEYaUiFq3Gm216z7DU3e_tKLnq7Yb8hZRBcBZq5swZbElBt_8wbOQnpyLuFGeCwwoUCstLqtN-PyNt6aq5t-Ev_YnNzgd4fuWxWFP2id5gfqsf3Wy3xbUmWQXX85eV88wLLXYXfJ3sKXBnEmaM","version":2}} -->
